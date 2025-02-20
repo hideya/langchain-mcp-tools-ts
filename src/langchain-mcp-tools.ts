@@ -186,37 +186,48 @@ async function convertSingleMcpToLangchainTools(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         schema: jsonSchemaToZod(tool.inputSchema as JsonSchema) as z.ZodObject<any>,
 
-        func: async (input) => {
+        func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
 
-          // Execute tool call
-          const result = await client?.request(
-            {
-              method: "tools/call",
-              params: {
-                name: tool.name,
-                arguments: input,
+          try {
+            // Execute tool call
+            const result = await client?.request(
+              {
+                method: "tools/call",
+                params: {
+                  name: tool.name,
+                  arguments: input,
+                },
               },
-            },
-            CallToolResultSchema
-          );
+              CallToolResultSchema
+            );
 
-          // Handles null/undefined cases gracefully
-          if (!result?.content) {
-            logger.info(`MCP tool "${serverName}"/"${tool.name}" received null/undefined result`);
-            return '';
+            // Handles null/undefined cases gracefully
+            if (!result?.content) {
+              logger.info(`MCP tool "${serverName}"/"${tool.name}" received null/undefined result`);
+              return '';
+            }
+
+            const textContent = result.content
+              .filter(content => content.type === 'text')
+              .map(content => content.text)
+              .join('\n\n');
+            // const textItems = result.content
+            //   .filter(content => content.type === 'text')
+            //   .map(content => content.text)
+            // const textContent = JSON.stringify(textItems);
+
+            // Log rough result size for monitoring
+            const size = new TextEncoder().encode(textContent).length
+            logger.info(`MCP tool "${serverName}"/"${tool.name}" received result (size: ${size})`);
+
+            // If no text content, return a clear message describing the situation
+            return textContent || 'No text content available in response';
+
+          } catch (error: unknown) {
+              logger.warn(`MCP tool "${serverName}"/"${tool.name}" caused error: ${error}`);
+              return `Error executing MCP tool: ${error}`;
           }
-
-          // For multiple content pieces or mixed types
-          const textContent = result.content
-            .filter(content => content.type === 'text')
-            .map(content => content.text)
-            .join('\n\n');
-
-          logger.info(`MCP tool "${serverName}"/"${tool.name}" received result (length: ${textContent.length})`);
-
-          // If no text content, return a clear message describing the situation
-          return textContent || 'No text content available in response';
         },
       })
     ));

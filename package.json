@@ -1,6 +1,6 @@
 {
   "name": "@h1deya/langchain-mcp-tools",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "MCP To LangChain Tools Conversion Utility",
   "license": "MIT",
   "keywords": [
@@ -33,11 +33,14 @@
     "build": "tsc",
     "prepare": "npm run build",
     "watch": "tsc --watch",
+    "example": "tsx examples/example.ts",
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env"
+    "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env",
+    "do-publish": "npm run clean && npm install && npm publish --access=public",
+    "publish-dry-run": "npm run clean && npm install && npm publish --access=public --dry-run"
   },
   "dependencies": {
     "@langchain/core": "^0.3.27",
@@ -47,11 +50,16 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@langchain/anthropic": "^0.3.11",
+    "@langchain/langgraph": "^0.2.36",
+    "@langchain/openai": "^0.3.16",
     "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",
     "@vitest/coverage-v8": "^2.1.8",
+    "dotenv": "^16.4.7",
     "eslint": "^9.17.0",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
     "vitest": "^2.1.8"
