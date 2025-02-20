@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+
+## [0.1.13] - 2025-02-20
+
+### Added
+
+- examples/exmaple.ts and `npm run example` sript to check the library functionality
+- `npm run publish-dry-run` and `npm run do-publish` for better publication handling
+
+### Changed
+
+### Fixed
+
+- Issue #8: Add try-catch surrounding MCP "tools/call" invocation to handle unexpected exceptions
+
+
 ## [0.1.12] - 2025-02-12
 
 ### Added
