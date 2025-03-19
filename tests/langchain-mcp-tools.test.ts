@@ -114,7 +114,7 @@ describe('convertMcpToLangchainTools', () => {
 
     // Test tool execution
     const result = await (tools[0] as DynamicStructuredTool).func({ input: 'test' });
-    expect(result).toBe('[{"type":"text","text":"test result"}]');
+    expect(result).toBe('test result');
 
     // Verify cleanup
     await cleanup();
@@ -188,7 +188,8 @@ describe('convertMcpToLangchainTools', () => {
     };
 
     const { tools } = await convertMcpToLangchainTools(config);
-    await expect((tools[0] as DynamicStructuredTool).func({})).rejects.toThrow('Tool execution failed');
+    await expect((tools[0] as DynamicStructuredTool).func({})).resolves.toContain('Error executing MCP tool:');
+
   });
 
   it('should handle different content types in tool results', async () => {
@@ -213,11 +214,7 @@ describe('convertMcpToLangchainTools', () => {
 
     const { tools } = await convertMcpToLangchainTools(config);
     const result = await (tools[0] as DynamicStructuredTool).func({ test: true });
-    expect(result).toBe(
-      '[{"type":"text","text":"text content"},' +
-      '{"type":"other","text":"should be filtered"},' +
-      '{"type":"text","text":"more text"}]'
-    );
+    expect(result).toBe('text content\n\nmore text');
   });
 
   it('should handle cleanup failures', async () => {
