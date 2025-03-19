@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 
+## [0.1.16] - 2025-03-19
+
+### Added
+
+### Changed
+
+### Fixed
+
+- Outdated tests that failed due to past behavioral expectations
+- Multiple vulnerabilities found in the dependent library versions
+
+
+## [0.1.15] - 2025-03-19
+
+### Added
+
+### Changed
+
+- Minor updates to README.me and example.ts
+
+### Fixed
+
+
+## [0.1.14] - 2025-02-21
+
+### Added
+
+### Changed
+
+- Minor updates to README.me and example.ts
+
+### Fixed
+
+
 ## [0.1.13] - 2025-02-20
 
 ### Added

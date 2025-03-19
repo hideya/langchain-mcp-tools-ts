@@ -1,6 +1,6 @@
 {
   "name": "@h1deya/langchain-mcp-tools",
-  "version": "0.1.14",
+  "version": "0.1.16",
   "description": "MCP To LangChain Tools Conversion Utility",
   "license": "MIT",
   "keywords": [
@@ -56,12 +56,12 @@
     "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",
-    "@vitest/coverage-v8": "^2.1.8",
+    "@vitest/coverage-v8": "^3.0.9",
     "dotenv": "^16.4.7",
     "eslint": "^9.17.0",
     "tsx": "^4.19.3",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
-    "vitest": "^2.1.8"
+    "vitest": "^3.0.9"
   }
 }

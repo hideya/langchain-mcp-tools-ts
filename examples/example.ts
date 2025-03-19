@@ -51,12 +51,12 @@ export async function test(): Promise<void> {
     const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
     mcpCleanup = cleanup
 
-    const llm = new ChatAnthropic({
-      model: 'claude-3-5-sonnet-latest', temperature: 0, maxTokens: 1000
-    });
-    // const llm = new ChatOpenAI({
-    //   model: 'gpt-4o', temperature: 0, maxTokens: 1000
+    // const llm = new ChatAnthropic({
+    //   model: 'claude-3-7-sonnet-latest'
     // });
+    const llm = new ChatOpenAI({
+      model: 'o3-mini'
+    });
 
     const agent = createReactAgent({
       llm,
