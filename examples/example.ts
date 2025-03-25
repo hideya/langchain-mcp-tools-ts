@@ -10,17 +10,12 @@ dotenv.config();
 import {
   convertMcpToLangchainTools,
   McpServersConfig,
-  McpServerCleanupFn
+  McpServerCleanupFn,
+  McpToolsLogger
 } from '../src/langchain-mcp-tools';
+import { LogLevel } from '../src/logger';
 
 export async function test(): Promise<void> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY environment variable needs to be set');
-  }
-  // if (!process.env.OPENAI_API_KEY) {
-  //   throw new Error('OPENAI_API_KEY environment variable needs to be set');
-  // }
-
   let mcpCleanup: McpServerCleanupFn | undefined;
 
   try {
@@ -48,7 +43,26 @@ export async function test(): Promise<void> {
       },
     };
 
-    const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+    // A very simple custom logger example (optional)
+    class SimpleConsoleLogger implements McpToolsLogger {
+      constructor(private readonly prefix: string = 'MCP') {}
+
+      private createLogMethod(level: string) {
+        return (...args: unknown[]) => console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
+      }
+
+      debug = this.createLogMethod('DEBUG');
+      info = this.createLogMethod('INFO');
+      warn = this.createLogMethod('WARN');
+      error = this.createLogMethod('ERROR');
+    }
+
+    // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+    // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, { logLevel: 'debug' });
+    const { tools, cleanup } = await convertMcpToLangchainTools(
+      mcpServers, { logger: new SimpleConsoleLogger() }
+    );
+
     mcpCleanup = cleanup
 
     // const llm = new ChatAnthropic({

@@ -17,6 +17,14 @@ export interface McpServersConfig {
   [key: string]: McpServerConfig;
 }
 
+// Define a domain-specific logger interface
+export interface McpToolsLogger {
+  debug(message: string, ...args: any[]): void;
+  info(message: string, ...args: any[]): void;
+  warn(message: string, ...args: any[]): void;
+  error(message: string, ...args: any[]): void;
+}
+
 interface LogOptions {
   logLevel?: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 }
@@ -47,7 +55,10 @@ class McpInitializationError extends Error implements McpError {
  * This function concurrently sets up all specified servers and aggregates their tools.
  *
  * @param configs - A mapping of server names to their respective configurations
- * @param options - Optional logging configuration
+ * @param options - Optional configuration settings
+ * @param options.logLevel - Log verbosity level ('fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace')
+ * @param options.logger - Custom logger implementation that follows the McpToolsLogger interface.
+ *                        If provided, overrides the default Logger instance.
  *
  * @returns A promise that resolves to:
  *          - tools: Array of StructuredTool instances ready for use with LangChain
@@ -63,14 +74,14 @@ class McpInitializationError extends Error implements McpError {
  */
 export async function convertMcpToLangchainTools(
   configs: McpServersConfig,
-  options?: LogOptions
+  options?: LogOptions & { logger?: McpToolsLogger }
 ): Promise<{
   tools: StructuredTool[];
   cleanup: McpServerCleanupFn;
 }> {
   const allTools: StructuredTool[] = [];
   const cleanupCallbacks: McpServerCleanupFn[] = [];
-  const logger = new Logger({ level: options?.logLevel || 'info' });
+  const logger = options?.logger || new Logger({ level: options?.logLevel || 'info' }) as McpToolsLogger;
 
   const serverInitPromises = Object.entries(configs).map(async ([name, config]) => {
     const result = await convertSingleMcpToLangchainTools(name, config, logger);
@@ -121,7 +132,7 @@ export async function convertMcpToLangchainTools(
  *
  * @param serverName - Unique identifier for the server instance
  * @param config - Server configuration including command, arguments, and environment variables
- * @param logger - Logger instance for recording operation details
+ * @param logger - McpToolsLogger instance for recording operation details
  *
  * @returns A promise that resolves to:
  *          - tools: Array of StructuredTool instances from this server
@@ -135,7 +146,7 @@ export async function convertMcpToLangchainTools(
 async function convertSingleMcpToLangchainTools(
   serverName: string,
   config: McpServerConfig,
-  logger: Logger
+  logger: McpToolsLogger
 ): Promise<{
   tools: StructuredTool[];
   cleanup: McpServerCleanupFn;
