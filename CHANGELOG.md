@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.17] - 2025-03-25
+
 ### Changed
 
+- Improve the API to accept a custom logger
 - Minor updates to README.me
 
 
