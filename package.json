@@ -46,6 +46,10 @@
     "@langchain/core": "^0.3.27",
     "@modelcontextprotocol/sdk": "^1.1.0",
     "@n8n/json-schema-to-zod": "^1.1.0",
+    "chokidar": "^4.0.3",
+    "memfs": "^4.17.0",
+    "named-pipe": "^1.0.0",
+    "temp": "^0.9.4",
     "zod": "^3.24.1"
   },
   "devDependencies": {

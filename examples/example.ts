@@ -20,57 +20,72 @@ export async function test(): Promise<void> {
 
   try {
     const mcpServers: McpServersConfig = {
-      filesystem: {
+      // filesystem: {
+      //   command: 'npx',
+      //   args: [
+      //     '-y',
+      //     '@modelcontextprotocol/server-filesystem',
+      //     '.'  // path to a directory to allow access to
+      //   ]
+      // },
+      // fetch: {
+      //   command: 'uvx',
+      //   args: [
+      //     'mcp-server-fetch'
+      //   ]
+      // },
+      // weather: {
+      //   command: 'npx',
+      //   args: [
+      //     '-y',
+      //    '@h1deya/mcp-server-weather'
+      //   ]
+      // },
+      'sequential-thinking': {
         command: 'npx',
         args: [
           '-y',
-          '@modelcontextprotocol/server-filesystem',
-          '.'  // path to a directory to allow access to
+          '@modelcontextprotocol/server-sequential-thinking'
         ]
       },
-      fetch: {
-        command: 'uvx',
-        args: [
-          'mcp-server-fetch'
-        ]
-      },
-      weather: {
-        command: 'npx',
-        args: [
-          '-y',
-         '@h1deya/mcp-server-weather'
-        ]
-      },
+      // playwright: {
+      //   command: 'npx',
+      //   args: [
+      //     '@playwright/mcp@latest'
+      //   ]
+      // },
     };
 
-    // A very simple custom logger example (optional)
-    class SimpleConsoleLogger implements McpToolsLogger {
-      constructor(private readonly prefix: string = 'MCP') {}
+    // // A very simple custom logger example (optional)
+    // class SimpleConsoleLogger implements McpToolsLogger {
+    //   constructor(private readonly prefix: string = 'MCP') {}
 
-      private createLogMethod(level: string) {
-        return (...args: unknown[]) => console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
-      }
+    //   private log(level: string, ...args: unknown[]) {
+    //     console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
+    //   }
 
-      debug = this.createLogMethod('DEBUG');
-      info = this.createLogMethod('INFO');
-      warn = this.createLogMethod('WARN');
-      error = this.createLogMethod('ERROR');
-    }
+    //   public debug(...args) { this.log('DEBUG', ...args); }
+    //   public info(...args) { this.log('INFO', ...args); }
+    //   public warn(...args) { this.log('WARN', ...args); }
+    //   public error(...args) { this.log('ERROR', ...args); }
+    // }
 
-    // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+    const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
     // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, { logLevel: 'debug' });
-    const { tools, cleanup } = await convertMcpToLangchainTools(
-      mcpServers, { logger: new SimpleConsoleLogger() }
-    );
+    // const { tools, cleanup } = await convertMcpToLangchainTools(
+    //   mcpServers, { logger: new SimpleConsoleLogger() }
+    // );
 
     mcpCleanup = cleanup
 
-    // const llm = new ChatAnthropic({
-    //   model: 'claude-3-7-sonnet-latest'
-    // });
-    const llm = new ChatOpenAI({
-      model: 'o3-mini'
+    const llm = new ChatAnthropic({
+      // model: 'claude-3-7-sonnet-latest'
+      model: 'claude-3-5-haiku-latest'
     });
+    // const llm = new ChatOpenAI({
+    //   model: 'o3-mini'
+    //   // model: 'gpt-4o-mini'
+    // });
 
     const agent = createReactAgent({
       llm,
@@ -79,7 +94,9 @@ export async function test(): Promise<void> {
 
     // const query = 'Read the news headlines on bbc.com';
     // const query = 'Read and briefly summarize the LICENSE file';
-    const query = "Tomorrow's weather in SF?"
+    // const query = "Tomorrow's weather in SF?"
+    // const query = "Show me bbc.com"
+    const query = "Use sequential thinking to arrange these events of backing bread in the correct sequence: baking, proofing, mixing, kneading, cooling"
 
     console.log('\x1b[33m');  // color to yellow
     console.log(query);

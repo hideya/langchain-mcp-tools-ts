@@ -6,6 +6,18 @@ import { jsonSchemaToZod, JsonSchema } from '@n8n/json-schema-to-zod';
 import { z } from 'zod';
 import { Logger } from './logger.js';
 
+import * as fs from 'fs';
+import temp from 'temp';
+// import { PassThrough } from 'stream';
+// import { WriteStream } from 'fs';
+// import { vol, createFsFromVolume } from 'memfs';
+// import FileHandle from 'fs/promises'
+// import chokidar from 'chokidar';
+// import namedPipe from 'named-pipe';
+// import crypto from 'crypto';
+// import os from 'os';
+// import path from 'path';
+
 // Base configuration types for MCP servers
 interface McpServerConfig {
   command: string;
@@ -125,6 +137,21 @@ export async function convertMcpToLangchainTools(
   return { tools: allTools, cleanup };
 }
 
+
+// function generateTempFilename(prefix = 'tmp-', suffix = '') {
+//   // Get the system temp directory in a platform-independent way
+//   const tmpDir = os.tmpdir();
+  
+//   // Generate a random string for uniqueness
+//   const randomString = crypto.randomBytes(16).toString('hex');
+  
+//   // Combine everything into a safe path
+//   const tempFilename = path.join(tmpDir, `${prefix}${randomString}${suffix}`);
+  
+//   return tempFilename;
+// }
+
+
 /**
  * Initializes a single MCP server and converts its capabilities into LangChain tools.
  * Sets up a connection to the server, retrieves available tools, and creates corresponding
@@ -165,10 +192,102 @@ async function convertSingleMcpToLangchainTools(
   }
 
   try {
+    // temp.track();
+    const tempFile = temp.openSync(`log-mcp-server-${serverName}-`);
+    console.log('*** tempFile.path: ', tempFile.path);
+    const tempLogPath = tempFile.path;
+    const fd = tempFile.fd;
+
+    const stats = fs.statSync(tempLogPath);
+    let lastSize = stats.size;
+
+    const watcher = fs.watch(tempLogPath, (eventType, filename) => {
+      if (eventType === 'change') {
+        // console.log(`*** file updated: "${filename}"`);
+        const stats = fs.statSync(tempLogPath);
+        const currentSize = stats.size;
+        if (currentSize > lastSize) {
+          const buffer = Buffer.alloc(currentSize - lastSize);
+          const fd = fs.openSync(tempLogPath, 'r');
+          fs.readSync(fd, buffer, 0, buffer.length, lastSize);
+          fs.closeSync(fd);
+          const newContent = buffer.toString();
+          console.log(`\n┌───── log for: "${serverName}" ─────┐`);
+          console.log(newContent);
+          console.log(`└───── log for: "${serverName}" ─────┘\n`);
+          lastSize = currentSize;
+        }
+      }
+    });
+    
+    // const tempLogPath = generateTempFilename('temp-file-', '.txt');
+    // const tempLogPath = './X-temp-file.log';
+    // console.log('*** tempLogPath:', tempLogPath);
+    // // const tempLogPath = `mcp-stderr-${serverName}.log`;
+    // await namedPipe.mkfifoPromise(tempLogPath);
+    // const fd = fs.openSync(tempLogPath, 'w+');
+    // console.log('*** fd:', fd);
+    
+    // // // const writeStream = fs.createWriteStream(tempLogPath);
+    // const fd = fs.openSync(tempLogPath, 'w');
+    // // console.log('*** fd:', fd);
+    // // // const writeStream = new WriteStream(null, { fd });
+
+    // const tempFile = temp.openSync('temp-file');
+    // console.log('*** tempFile.path ', tempFile.path);
+    // const fd = tempFile.fd;
+
+    // const stats = fs.statSync(tempLogPath);
+    // let lastSize = stats.size;
+
+    // // chokidar
+    // const watcher = chokidar.watch(tempLogPath, {
+    //   persistent: true,
+    //   ignoreInitial: true,
+    //   awaitWriteFinish: {
+    //     stabilityThreshold: 2000,
+    //     pollInterval: 100
+    //   }
+    // });
+    // watcher.on('change', (path) => {
+    //   console.log(`file ${path} updated`);
+    // });
+    // watcher.on('error', (error) => {
+    //   console.error(`update error: ${error}`);
+    // });
+
+    // const writeStream = new WriteStream(null, { fd });
+    // writeStream.on('data', (data) => {
+    //   const logText = data.toString();
+    //   console.log(`server log: ${logText}`);
+    // });
+
+    // const writeStream = fs.createWriteStream(tempLogPath);
+
+    // const readStream = fs.createReadStream(tempLogPath);
+    // readStream.on('data', (data) => {
+    //   const logText = data.toString();
+    //   // logs.push(logText);
+    //   console.log(`server log: ${logText}`);
+    // });
+    // const stderrCapture = new PassThrough();
+    // stderrCapture.on('data', (data) => {
+    //   console.log(`server log ${data.toString()}`);
+    // });
+
+    // const tmpDirName = `/tmp-${serverName}`;
+    // vol.mkdirSync(tmpDirName);
+    // const fd = vol.openSync(`${tmpDirName}/test`, 'a+');
+    // console.log('***', fd);
+    // vol.writeSync(fd, '*** New file content');
+    // vol.closeSync(fd);
+
     transport = new StdioClientTransport({
       command: config.command,
       args: config.args as string[],
       env: env,
+      stderr: fd
+      // stderr: writeStream
     });
 
     client = new Client(
@@ -183,6 +302,17 @@ async function convertSingleMcpToLangchainTools(
 
     await client.connect(transport);
     logger.info(`MCP server "${serverName}": connected`);
+
+    // const childProcess = (transport as any)._process;
+    // console.log('*** childProcess.stderr', childProcess.stderr);
+    // // PassThrough で入力内容を中継・モニター
+    // // const passThrough = new PassThrough();
+    // // 入力内容をモニター
+    // childProcess.stderr?.on('data', (chunk) => {
+    //   console.log(`Sent to child process: ${chunk.toString()}`);
+    // });
+    // // PassThrough に書き込み内容を流しつつ、子プロセスに転送
+    // // passThrough.pipe(childProcess.stderr);
 
     const toolsResponse = await client.request(
       { method: "tools/list" },
@@ -247,9 +377,16 @@ async function convertSingleMcpToLangchainTools(
     tools.forEach((tool) => logger.info(`- ${tool.name}`));
 
     async function cleanup(): Promise<void> {
-      if (transport) {
-        await transport.close();
-        logger.info(`MCP server "${serverName}": session closed`);
+      try {
+        if (transport) {
+          await transport.close();
+          logger.info(`MCP server "${serverName}": session closed`);
+        }
+      } finally {
+        watcher.close();
+        fs.closeSync(tempFile.fd);
+        fs.unlinkSync(tempFile.path);
+        // temp.cleanupSync();
       }
     }
 
