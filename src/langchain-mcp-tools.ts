@@ -201,7 +201,7 @@ async function convertSingleMcpToLangchainTools(
     const stats = fs.statSync(tempLogPath);
     let lastSize = stats.size;
 
-    const watcher = fs.watch(tempLogPath, (eventType, filename) => {
+    const watcher = fs.watch(tempLogPath, (eventType: string, filename: unknown) => {
       if (eventType === 'change') {
         // console.log(`*** file updated: "${filename}"`);
         const stats = fs.statSync(tempLogPath);

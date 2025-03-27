@@ -57,12 +57,12 @@ class Logger {
     return typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
   }
 
-  public trace(...args) { this.log(LogLevel.TRACE, ...args); }
-  public debug(...args) { this.log(LogLevel.DEBUG, ...args); }
-  public info(...args) { this.log(LogLevel.INFO, ...args); }
-  public warn(...args) { this.log(LogLevel.WARN, ...args); }
-  public error(...args) { this.log(LogLevel.ERROR, ...args); }
-  public fatal(...args) { this.log(LogLevel.FATAL, ...args); }
+  public trace(...args: unknown[]) { this.log(LogLevel.TRACE, ...args); }
+  public debug(...args: unknown[]) { this.log(LogLevel.DEBUG, ...args); }
+  public info(...args: unknown[]) { this.log(LogLevel.INFO, ...args); }
+  public warn(...args: unknown[]) { this.log(LogLevel.WARN, ...args); }
+  public error(...args: unknown[]) { this.log(LogLevel.ERROR, ...args); }
+  public fatal(...args: unknown[]) { this.log(LogLevel.FATAL, ...args); }
 }
 
 export { Logger, LogLevel, LogLevelString };
