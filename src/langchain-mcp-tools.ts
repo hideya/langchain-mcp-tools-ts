@@ -11,6 +11,7 @@ interface McpServerConfig {
   command: string;
   args: readonly string[];
   env?: Readonly<Record<string, string>>;
+  errlog?: number;
 }
 
 export interface McpServersConfig {
@@ -169,6 +170,7 @@ async function convertSingleMcpToLangchainTools(
       command: config.command,
       args: config.args as string[],
       env: env,
+      stderr: config.errlog
     });
 
     client = new Client(

@@ -3,6 +3,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatOpenAI } from '@langchain/openai';
 import dotenv from 'dotenv';
+import * as fs from 'fs';
 
 // Initialize environment variables
 dotenv.config();
@@ -41,20 +42,39 @@ export async function test(): Promise<void> {
          '@h1deya/mcp-server-weather'
         ]
       },
+      // 'sequential-thinking': {
+      //   command: 'npx',
+      //   args: [
+      //     '-y',
+      //     '@modelcontextprotocol/server-sequential-thinking'
+      //   ]
+      // },
+      // playwright: {
+      //   command: 'npx',
+      //   args: [
+      //     '@playwright/mcp@latest'
+      //   ]
+      // },
     };
+
+    Object.keys(mcpServers).forEach(serverName => {
+      const logPath = `mcp-server-${serverName}.log`;
+      const logFd = fs.openSync(logPath, 'w');
+      mcpServers[serverName].errlog = logFd;
+    });
 
     // A very simple custom logger example (optional)
     class SimpleConsoleLogger implements McpToolsLogger {
       constructor(private readonly prefix: string = 'MCP') {}
 
-      private createLogMethod(level: string) {
-        return (...args: unknown[]) => console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
+      private log(level: string, ...args: unknown[]) {
+        console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
       }
 
-      debug = this.createLogMethod('DEBUG');
-      info = this.createLogMethod('INFO');
-      warn = this.createLogMethod('WARN');
-      error = this.createLogMethod('ERROR');
+      public debug(...args: unknown[]) { this.log('DEBUG', ...args); }
+      public info(...args: unknown[]) { this.log('INFO', ...args); }
+      public warn(...args: unknown[]) { this.log('WARN', ...args); }
+      public error(...args: unknown[]) { this.log('ERROR', ...args); }
     }
 
     // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
@@ -80,6 +100,8 @@ export async function test(): Promise<void> {
     // const query = 'Read the news headlines on bbc.com';
     // const query = 'Read and briefly summarize the LICENSE file';
     const query = "Tomorrow's weather in SF?"
+    // const query = "Use sequential thinking to arrange these events of backing bread " +
+    //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
 
     console.log('\x1b[33m');  // color to yellow
     console.log(query);

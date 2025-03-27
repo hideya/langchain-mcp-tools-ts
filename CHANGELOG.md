@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+
+## [0.1.18] - 2025-03-27
+
+### Changed
+
+- Enhance McpServersConfig to include a filedescriptor to which MCP server's stderr is redirected
+
+
 ## [0.1.17] - 2025-03-25
 
 ### Changed
