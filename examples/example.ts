@@ -60,7 +60,7 @@ export async function test(): Promise<void> {
     Object.keys(mcpServers).forEach(serverName => {
       const logPath = `mcp-server-${serverName}.log`;
       const logFd = fs.openSync(logPath, 'w');
-      mcpServers[serverName].errlog = logFd;
+      mcpServers[serverName].stderr = logFd;
     });
 
     // A very simple custom logger example (optional)

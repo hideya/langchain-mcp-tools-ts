@@ -1,21 +1,13 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CallToolResultSchema, ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { DynamicStructuredTool, StructuredTool } from '@langchain/core/tools';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport, StdioServerParameters } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { CallToolResultSchema, ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { jsonSchemaToZod, JsonSchema } from '@n8n/json-schema-to-zod';
 import { z } from 'zod';
 import { Logger } from './logger.js';
 
-// Base configuration types for MCP servers
-interface McpServerConfig {
-  command: string;
-  args: readonly string[];
-  env?: Readonly<Record<string, string>>;
-  errlog?: number;
-}
-
 export interface McpServersConfig {
-  [key: string]: McpServerConfig;
+  [key: string]: StdioServerParameters;
 }
 
 // Define a domain-specific logger interface
@@ -146,7 +138,7 @@ export async function convertMcpToLangchainTools(
  */
 async function convertSingleMcpToLangchainTools(
   serverName: string,
-  config: McpServerConfig,
+  config: StdioServerParameters,
   logger: McpToolsLogger
 ): Promise<{
   tools: StructuredTool[];
@@ -170,7 +162,7 @@ async function convertSingleMcpToLangchainTools(
       command: config.command,
       args: config.args as string[],
       env: env,
-      stderr: config.errlog
+      stderr: config.stderr
     });
 
     client = new Client(

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 
+## [0.1.19] - 2025-03-28
+
+### Changed
+
+- Follow StdioServerParameters definition closely: errlog -> stderr
+
+
 ## [0.1.18] - 2025-03-27
 
 ### Changed
