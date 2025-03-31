@@ -27,7 +27,8 @@ export async function test(): Promise<void> {
           '-y',
           '@modelcontextprotocol/server-filesystem',
           '.'  // path to a directory to allow access to
-        ]
+        ],
+        cwd: '/tmp'  // the working directory to be use by the server
       },
       fetch: {
         command: 'uvx',
@@ -42,6 +43,15 @@ export async function test(): Promise<void> {
          '@h1deya/mcp-server-weather'
         ]
       },
+      // sqlite: {
+      //   command: 'uvx',
+      //   args: [
+      //     'mcp-server-sqlite',
+      //     '--db-path',
+      //     'mcp-server-sqlite-test.sqlite3'
+      //   ],
+      //   cwd: '/tmp'  // the working directory to be use by the server
+      // },
       // 'sequential-thinking': {
       //   command: 'npx',
       //   args: [
@@ -57,6 +67,7 @@ export async function test(): Promise<void> {
       // },
     };
 
+    // Set file descriptor to which MCP server's stderr is redirected
     Object.keys(mcpServers).forEach(serverName => {
       const logPath = `mcp-server-${serverName}.log`;
       const logFd = fs.openSync(logPath, 'w');
@@ -99,9 +110,13 @@ export async function test(): Promise<void> {
 
     // const query = 'Read the news headlines on bbc.com';
     // const query = 'Read and briefly summarize the LICENSE file';
-    const query = "Tomorrow's weather in SF?"
-    // const query = "Use sequential thinking to arrange these events of backing bread " +
-    //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
+    const query = 'Tell me the number of directories in the current directory';
+    // const query = "Tomorrow's weather in SF?";
+    // const query = 'Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively';
+    // const query = 'Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, ' +
+    //   'increment the coutns by 1, and show all the items in the DB.'
+    // const query = 'Use sequential thinking to arrange these events of backing bread ' +
+    //   'in the correct sequence: baking, proofing, mixing, kneading, cooling'
 
     console.log('\x1b[33m');  // color to yellow
     console.log(query);
