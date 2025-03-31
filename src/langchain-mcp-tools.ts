@@ -147,20 +147,12 @@ async function convertSingleMcpToLangchainTools(
   tools: StructuredTool[];
   cleanup: McpServerCleanupFn;
 }> {
-  let transport: Transport | null = null;
-  let client: Client | null = null;
-
-  logger.info(`MCP server "${serverName}": initializing with: ${JSON.stringify(config)}`);
-
-  // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
-  // To avoid confusion, it was decided to automatically append it to the env
-  // if not explicitly set by the config.
-  const env = { ...config.env };
-  if (!env.PATH) {
-    env.PATH = process.env.PATH || '';
-  }
-
   try {
+    let transport: Transport | null = null;
+    let client: Client | null = null;
+
+    logger.info(`MCP server "${serverName}": initializing with: ${JSON.stringify(config)}`);
+
     const url_or_command = config.command;
 
     let url: URL | undefined = undefined;
@@ -171,10 +163,20 @@ async function convertSingleMcpToLangchainTools(
     }
   
     if (url?.protocol === "http:" || url?.protocol === "https:") {
-      transport = new SSEClientTransport(new URL(url_or_command));
+      transport = new SSEClientTransport(url);
+
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
-      transport = new WebSocketClientTransport(new URL(url_or_command));
+      transport = new WebSocketClientTransport(url);
+
     } else {
+      // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
+      // To avoid confusion, it was decided to automatically append it to the env
+      // if not explicitly set by the config.
+      const env = { ...config.env };
+      if (!env.PATH) {
+        env.PATH = process.env.PATH || '';
+      }
+
       transport = new StdioClientTransport({
         command: url_or_command,
         args: config.args,
