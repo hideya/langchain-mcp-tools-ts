@@ -1,6 +1,9 @@
 import { DynamicStructuredTool, StructuredTool } from '@langchain/core/tools';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport, StdioServerParameters } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StdioClientTransport, StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { jsonSchemaToZod, JsonSchema } from '@n8n/json-schema-to-zod';
 import { z } from 'zod';
@@ -12,10 +15,10 @@ export interface McpServersConfig {
 
 // Define a domain-specific logger interface
 export interface McpToolsLogger {
-  debug(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
+  debug(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
 }
 
 interface LogOptions {
@@ -144,7 +147,7 @@ async function convertSingleMcpToLangchainTools(
   tools: StructuredTool[];
   cleanup: McpServerCleanupFn;
 }> {
-  let transport: StdioClientTransport | null = null;
+  let transport: Transport | null = null;
   let client: Client | null = null;
 
   logger.info(`MCP server "${serverName}": initializing with: ${JSON.stringify(config)}`);
@@ -158,12 +161,28 @@ async function convertSingleMcpToLangchainTools(
   }
 
   try {
-    transport = new StdioClientTransport({
-      command: config.command,
-      args: config.args as string[],
-      env: env,
-      stderr: config.stderr
-    });
+    const url_or_command = config.command;
+
+    let url: URL | undefined = undefined;
+    try {
+      url = new URL(url_or_command);
+    } catch {
+      // Ignore
+    }
+  
+    if (url?.protocol === "http:" || url?.protocol === "https:") {
+      transport = new SSEClientTransport(new URL(url_or_command));
+    } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
+      transport = new WebSocketClientTransport(new URL(url_or_command));
+    } else {
+      transport = new StdioClientTransport({
+        command: url_or_command,
+        args: config.args,
+        env,
+        stderr: config.stderr,
+        cwd: config.cwd
+      });
+    }
 
     client = new Client(
       {

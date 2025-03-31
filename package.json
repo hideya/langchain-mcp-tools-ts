@@ -1,6 +1,6 @@
 {
   "name": "@h1deya/langchain-mcp-tools",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "MCP To LangChain Tools Conversion Utility",
   "license": "MIT",
   "keywords": [
@@ -33,7 +33,7 @@
     "build": "tsc",
     "prepare": "npm run build",
     "watch": "tsc --watch",
-    "example": "tsx examples/example.ts",
+    "simple-usage": "tsx testfiles/simple-usage.ts",
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@langchain/core": "^0.3.27",
-    "@modelcontextprotocol/sdk": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.8.0",
     "@n8n/json-schema-to-zod": "^1.1.0",
     "zod": "^3.24.1"
   },
