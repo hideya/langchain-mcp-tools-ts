@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 
+## [0.2.0] - 2025-04-04
+
+### Changed
+- Add support for SSE and Websocket remote MCP servers
+- Use double quotes instead of single quotes for string literals
+
+
 ## [0.1.20] - 2025-03-31
 
 ### Changed
