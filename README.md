@@ -50,12 +50,12 @@ and is expressed as a JS Object, e.g.:
 ```ts
 const mcpServers: McpServersConfig = {
   filesystem: {
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem', '.']
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
   },
   fetch: {
-    command: 'uvx',
-    args: ['mcp-server-fetch']
+    command: "uvx",
+    args: ["mcp-server-fetch"]
   }
 };
 
@@ -73,10 +73,10 @@ to be invoked to close all MCP server sessions when finished.
 The returned tools can be used with LangChain, e.g.:
 
 ```ts
-// import { ChatAnthropic } from '@langchain/anthropic';
-const llm = new ChatAnthropic({ model: 'claude-3-7-sonnet-latest' });
+// import { ChatAnthropic } from "@langchain/anthropic";
+const llm = new ChatAnthropic({ model: "claude-3-7-sonnet-latest" });
 
-// import { createReactAgent } from '@langchain/langgraph/prebuilt';
+// import { createReactAgent } from "@langchain/langgraph/prebuilt";
 const agent = createReactAgent({
   llm,
   tools
@@ -92,13 +92,56 @@ try [this LangChain application built with the utility](https://github.com/hidey
 For detailed information on how to use this library, please refer to the following document:  
 ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
 
+## Experimental Features
+
+### Remote MCP Server Support
+
+`mcp_servers` configuration for SSE and Websocket servers are as follows:
+
+```ts
+    "sse-server-name": {
+        url: `http://${sse_server_host}:${sse_server_port}/...`
+    },
+
+    "ws-server-name": {
+        url: `ws://${ws_server_host}:${ws_server_port}/...`
+    },
+```
+
+Note that the key `"url"` may be changed in the future to match
+the MCP server configurations used by Claude for Desktop once
+it introduces remote server support.
+
+### Working Directory Configuration for Local MCP Servers
+
+The working directory that is used when spawning a local MCP server
+can be specified with the `"cwd"` key as follows:
+
+```ts
+    "local-server-name": {
+      command: "...",
+      args: [...],
+      cwd: "/working/directory"  // the working dir to be use by the server
+    },
+```
+
+### Configuration for MCP Server stderr Redirection
+
+A new key `"stderr"` has been introduced to specify a file descriptor
+to which MCP server's stderr is redirected.
+
+```ts
+    const logPath = `mcp-server-${serverName}.log`;
+    const logFd = fs.openSync(logPath, "w");
+    mcpServers[serverName].stderr = logFd;
+```
+
+The key `stderr` is derived from TypeScript SDK's `StdioServerParameters`.
+
 ## Limitations
 
-Currently, only text results of tool calls are supported.
-
-Remote MCP server is not supported.
-
-Fatures other than [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are not supported.
+- Currently, only text results of tool calls are supported.
+- Fatures other than [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are not supported.
 
 ## Change Log
 
