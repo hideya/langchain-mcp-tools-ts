@@ -1,16 +1,39 @@
-import { DynamicStructuredTool, StructuredTool } from '@langchain/core/tools';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { IOType } from "node:child_process";
+import { Stream } from "node:stream";
+import { DynamicStructuredTool, StructuredTool } from "@langchain/core/tools";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { StdioClientTransport, StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { CallToolResultSchema, ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import { jsonSchemaToZod, JsonSchema } from '@n8n/json-schema-to-zod';
-import { z } from 'zod';
-import { Logger } from './logger.js';
+import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { jsonSchemaToZod, JsonSchema } from "@n8n/json-schema-to-zod";
+import { z } from "zod";
+import { Logger } from "./logger.js";
+
+
+interface CommandBasedConfig {
+  url?: never;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  stderr?: IOType | Stream | number;
+  cwd?: string;
+}
+
+interface UrlBasedConfig {
+  url: string;
+  command?: never;
+  args?: never;
+  env?: never;
+  stderr?: never;
+  cwd?: never;
+}
+
+type McpServerConfig = CommandBasedConfig | UrlBasedConfig;
 
 export interface McpServersConfig {
-  [key: string]: StdioServerParameters;
+  [key: string]: McpServerConfig;
 }
 
 // Define a domain-specific logger interface
@@ -22,7 +45,7 @@ export interface McpToolsLogger {
 }
 
 interface LogOptions {
-  logLevel?: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
+  logLevel?: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
 }
 
 interface McpError extends Error {
@@ -42,7 +65,7 @@ class McpInitializationError extends Error implements McpError {
     public details?: unknown
   ) {
     super(message);
-    this.name = 'McpInitializationError';
+    this.name = "McpInitializationError";
   }
 }
 
@@ -52,7 +75,7 @@ class McpInitializationError extends Error implements McpError {
  *
  * @param configs - A mapping of server names to their respective configurations
  * @param options - Optional configuration settings
- * @param options.logLevel - Log verbosity level ('fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace')
+ * @param options.logLevel - Log verbosity level ("fatal" | "error" | "warn" | "info" | "debug" | "trace")
  * @param options.logger - Custom logger implementation that follows the McpToolsLogger interface.
  *                        If provided, overrides the default Logger instance.
  *
@@ -64,8 +87,8 @@ class McpInitializationError extends Error implements McpError {
  *
  * @example
  * const { tools, cleanup } = await convertMcpToLangchainTools({
- *   filesystem: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '.'] },
- *   fetch: { command: 'uvx', args: ['mcp-server-fetch'] }
+ *   filesystem: { command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "."] },
+ *   fetch: { command: "uvx", args: ["mcp-server-fetch"] }
  * });
  */
 export async function convertMcpToLangchainTools(
@@ -77,7 +100,7 @@ export async function convertMcpToLangchainTools(
 }> {
   const allTools: StructuredTool[] = [];
   const cleanupCallbacks: McpServerCleanupFn[] = [];
-  const logger = options?.logger || new Logger({ level: options?.logLevel || 'info' }) as McpToolsLogger;
+  const logger = options?.logger || new Logger({ level: options?.logLevel || "info" }) as McpToolsLogger;
 
   const serverInitPromises = Object.entries(configs).map(async ([name, config]) => {
     const result = await convertSingleMcpToLangchainTools(name, config, logger);
@@ -94,7 +117,7 @@ export async function convertMcpToLangchainTools(
 
   // Process successful initializations and log failures
   results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       const { result: { tools, cleanup } } = result.value;
       allTools.push(...tools);
       cleanupCallbacks.push(cleanup);
@@ -109,7 +132,7 @@ export async function convertMcpToLangchainTools(
     const results = await Promise.allSettled(cleanupCallbacks.map(callback => callback()));
 
     // Log any cleanup failures
-    const failures = results.filter(result => result.status === 'rejected');
+    const failures = results.filter(result => result.status === "rejected");
     failures.forEach((failure, index) => {
       logger.error(`MCP server "${serverNames[index]}": failed to close: ${failure.reason}`);
     });
@@ -141,46 +164,47 @@ export async function convertMcpToLangchainTools(
  */
 async function convertSingleMcpToLangchainTools(
   serverName: string,
-  config: StdioServerParameters,
+  config: McpServerConfig,
   logger: McpToolsLogger
 ): Promise<{
   tools: StructuredTool[];
   cleanup: McpServerCleanupFn;
 }> {
   let transport: Transport | null = null;
-  let client: Client | null = null;
-
-  logger.info(`MCP server "${serverName}": initializing with: ${JSON.stringify(config)}`);
-
-  // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
-  // To avoid confusion, it was decided to automatically append it to the env
-  // if not explicitly set by the config.
-  const env = { ...config.env };
-  if (!env.PATH) {
-    env.PATH = process.env.PATH || '';
-  }
-
   try {
-    const url_or_command = config.command;
+    let client: Client | null = null;
+
+    logger.info(`MCP server "${serverName}": initializing with: ${JSON.stringify(config)}`);
 
     let url: URL | undefined = undefined;
     try {
-      url = new URL(url_or_command);
+      url = new URL((config as UrlBasedConfig).url);
     } catch {
       // Ignore
     }
   
     if (url?.protocol === "http:" || url?.protocol === "https:") {
-      transport = new SSEClientTransport(new URL(url_or_command));
+      transport = new SSEClientTransport(url);
+
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
-      transport = new WebSocketClientTransport(new URL(url_or_command));
+      transport = new WebSocketClientTransport(url);
+
     } else {
+      // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
+      // To avoid confusion, it was decided to automatically append it to the env
+      // if not explicitly set by the config.
+      const stdioServerConfig = config as CommandBasedConfig;
+      const env = { ...stdioServerConfig.env };
+      if (!env.PATH) {
+        env.PATH = process.env.PATH || "";
+      }
+
       transport = new StdioClientTransport({
-        command: url_or_command,
-        args: config.args,
+        command: stdioServerConfig.command,
+        args: stdioServerConfig.args,
         env,
-        stderr: config.stderr,
-        cwd: config.cwd
+        stderr: stdioServerConfig.stderr,
+        cwd: stdioServerConfig.cwd
       });
     }
 
@@ -205,7 +229,7 @@ async function convertSingleMcpToLangchainTools(
     const tools = toolsResponse.tools.map((tool) => (
       new DynamicStructuredTool({
         name: tool.name,
-        description: tool.description || '',
+        description: tool.description || "",
         // FIXME
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         schema: jsonSchemaToZod(tool.inputSchema as JsonSchema) as z.ZodObject<any>,
@@ -229,15 +253,15 @@ async function convertSingleMcpToLangchainTools(
             // Handles null/undefined cases gracefully
             if (!result?.content) {
               logger.info(`MCP tool "${serverName}"/"${tool.name}" received null/undefined result`);
-              return '';
+              return "";
             }
 
             const textContent = result.content
-              .filter(content => content.type === 'text')
+              .filter(content => content.type === "text")
               .map(content => content.text)
-              .join('\n\n');
+              .join("\n\n");
             // const textItems = result.content
-            //   .filter(content => content.type === 'text')
+            //   .filter(content => content.type === "text")
             //   .map(content => content.text)
             // const textContent = JSON.stringify(textItems);
 
@@ -246,7 +270,7 @@ async function convertSingleMcpToLangchainTools(
             logger.info(`MCP tool "${serverName}"/"${tool.name}" received result (size: ${size})`);
 
             // If no text content, return a clear message describing the situation
-            return textContent || 'No text content available in response';
+            return textContent || "No text content available in response";
 
           } catch (error: unknown) {
               logger.warn(`MCP tool "${serverName}"/"${tool.name}" caused error: ${error}`);

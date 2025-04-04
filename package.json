@@ -1,6 +1,6 @@
 {
   "name": "@h1deya/langchain-mcp-tools",
-  "version": "0.1.20",
+  "version": "0.2.0",
   "description": "MCP To LangChain Tools Conversion Utility",
   "license": "MIT",
   "keywords": [
@@ -40,12 +40,13 @@
     "test:coverage": "vitest run --coverage",
     "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env",
     "do-publish": "npm run clean && npm install && npm publish --access=public",
-    "publish-dry-run": "npm run clean && npm install && npm publish --access=public --dry-run"
+    "test-publish": "npm run clean && npm install && npm publish --access=public --dry-run"
   },
   "dependencies": {
     "@langchain/core": "^0.3.27",
     "@modelcontextprotocol/sdk": "^1.8.0",
     "@n8n/json-schema-to-zod": "^1.1.0",
+    "ws": "^8.18.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
