@@ -41,6 +41,9 @@ npm i @h1deya/langchain-mcp-tools
 
 ## Quick Start
 
+A minimal but complete working usage example can be found
+[in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
+
 `convertMcpToLangchainTools()` utility function accepts MCP server configurations
 that follow the same structure as
 [Claude for Desktop](https://modelcontextprotocol.io/quickstart/user),
@@ -83,9 +86,6 @@ const agent = createReactAgent({
 });
 ```
 
-Find complete, minimal working usage examples
-[here](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
-
 For hands-on experimentation with MCP server integration,
 try [this LangChain application built with the utility](https://github.com/hideya/mcp-client-langchain-ts)
 
@@ -112,9 +112,12 @@ Note that the key `"url"` may be changed in the future to match
 the MCP server configurations used by Claude for Desktop once
 it introduces remote server support.
 
+A usage example can be found [here](
+https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd5274d95d3f6d14bed0937a6/src/index.ts#L26-L38)
+
 ### Working Directory Configuration for Local MCP Servers
 
-The working directory that is used when spawning a local MCP server
+The working directory that is used when spawning a local (stdio) MCP server
 can be specified with the `"cwd"` key as follows:
 
 ```ts
@@ -125,10 +128,13 @@ can be specified with the `"cwd"` key as follows:
     },
 ```
 
-### Configuration for MCP Server stderr Redirection
+The key name `cwd` is derived from TypeScript SDK's `StdioServerParameters`.
+
+### Configuration for Local MCP Server `stderr` Redirection
 
 A new key `"stderr"` has been introduced to specify a file descriptor
-to which MCP server's stderr is redirected.
+to which local (stdio) MCP server's stderr is redirected.  
+The key name `stderr` is derived from TypeScript SDK's `StdioServerParameters`.
 
 ```ts
     const logPath = `mcp-server-${serverName}.log`;
@@ -136,12 +142,13 @@ to which MCP server's stderr is redirected.
     mcpServers[serverName].stderr = logFd;
 ```
 
-The key `stderr` is derived from TypeScript SDK's `StdioServerParameters`.
+A usage example can be found [here](
+https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd5274d95d3f6d14bed0937a6/src/index.ts#L72-L83)
 
 ## Limitations
 
 - Currently, only text results of tool calls are supported.
-- Fatures other than [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are not supported.
+- MCP features other than [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are not supported.
 
 ## Change Log
 

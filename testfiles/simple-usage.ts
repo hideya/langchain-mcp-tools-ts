@@ -9,6 +9,7 @@ import * as net from 'net';
 import WebSocket from 'ws';  // needed obly for WebSocket MCP test server
 
 // Initialize environment variables
+// Be sure to set ANTHROPIC_API_KEY and/or OPENAI_API_KEY as needed
 dotenv.config();
 
 import {
@@ -31,12 +32,12 @@ export async function test(): Promise<void> {
   // const [sseServerProcess, sseServerPort] = await startMcpServer(
   //   "SSE",  "npx -y @h1deya/mcp-server-weather")
 
-  // // NOTE: without the following, I got this error:
-  // // ReferenceError: WebSocket is not defined
-  // //   at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
-  // global.WebSocket = WebSocket as any;
-  // const [wsServerProcess, wsServerPort] = await startMcpServer(
-  //   "WS",  "npx -y @h1deya/mcp-server-weather")
+  // NOTE: without the following, I got this error:
+  // ReferenceError: WebSocket is not defined
+  //   at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
+  global.WebSocket = WebSocket as any;
+  const [wsServerProcess, wsServerPort] = await startMcpServer(
+    "WS",  "npx -y @h1deya/mcp-server-weather")
 
   try {
     const mcpServers: McpServersConfig = {
@@ -55,19 +56,19 @@ export async function test(): Promise<void> {
           "mcp-server-fetch"
         ]
       },
-      weather: {
-        command: "npx",
-        args: [
-          "-y",
-         "@h1deya/mcp-server-weather"
-        ]
-      },
+      // weather: {
+      //   command: "npx",
+      //   args: [
+      //     "-y",
+      //    "@h1deya/mcp-server-weather"
+      //   ]
+      // },
       // weather: {
       //   url: `http://localhost:${sseServerPort}/sse`
       // },
-      // weather: {
-      //   url: `ws://localhost:${wsServerPort}/message`
-      // },
+      weather: {
+        url: `ws://localhost:${wsServerPort}/message`
+      },
 
       // sqlite: {
       //   command: "uvx",
@@ -191,7 +192,7 @@ export async function test(): Promise<void> {
 /**
  * Start an MCP server process via supergateway with the specified transport
  * type.  Supergateway runs MCP stdio-based servers over SSE or WebSockets
- * and is used here to run the SSE/WS servers for connection testing.
+ * and is used here to run local SSE/WS servers for connection testing.
  * Ref: https://github.com/supercorp-ai/supergateway
  *
  * @param transportType - The transport type, either 'sse' or 'ws'
