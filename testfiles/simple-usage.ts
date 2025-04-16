@@ -1,16 +1,13 @@
+import "dotenv/config";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
-import dotenv from "dotenv";
 import * as child_process from 'child_process';
 import * as fs from "fs";
 import * as net from 'net';
 import WebSocket from 'ws';  // needed obly for WebSocket MCP test server
 
-// Initialize environment variables
-// Be sure to set ANTHROPIC_API_KEY and/or OPENAI_API_KEY as needed
-dotenv.config();
 
 import {
   convertMcpToLangchainTools,
@@ -25,18 +22,18 @@ export async function test(): Promise<void> {
   let mcpCleanup: McpServerCleanupFn | undefined;
   const openedLogFiles: { [serverName: string]: number } = {};
 
-  // If you are interested in testing the SSE/WS server setup, comment out
+  // If you are interested in testing the SSE/WS server setup, uncomment
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the one for the stdio server
 
-  // const [sseServerProcess, sseServerPort] = await startMcpServer(
+  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
   //   "SSE",  "npx -y @h1deya/mcp-server-weather")
 
   // NOTE: without the following, I got this error:
   // ReferenceError: WebSocket is not defined
   //   at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
   global.WebSocket = WebSocket as any;
-  const [wsServerProcess, wsServerPort] = await startMcpServer(
+  const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
     "WS",  "npx -y @h1deya/mcp-server-weather")
 
   try {
@@ -95,7 +92,7 @@ export async function test(): Promise<void> {
     };
 
     // If you are interested in MCP server's stderr redirection,
-    // comment out the following code snippets.
+    // uncomment the following code snippets.
 
     // Set a file descriptor to which MCP server's stderr is redirected
     Object.keys(mcpServers).forEach(serverName => {
@@ -110,11 +107,9 @@ export async function test(): Promise<void> {
     // A very simple custom logger example (optional)
     class SimpleConsoleLogger implements McpToolsLogger {
       constructor(private readonly prefix: string = "MCP") {}
-
       private log(level: string, ...args: unknown[]) {
         console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
       }
-
       public debug(...args: unknown[]) { this.log("DEBUG", ...args); }
       public info(...args: unknown[]) { this.log("INFO", ...args); }
       public warn(...args: unknown[]) { this.log("WARN", ...args); }
@@ -200,7 +195,7 @@ export async function test(): Promise<void> {
  * @param waitTime - Time to wait for the server to start listening on its port
  * @returns A Promise resolving to [serverProcess, serverPort]
  */
-async function startMcpServer(
+async function startRemoteMcpServerLocally(
   transportType: string,
   mcpServerRunCommand: string,
   waitTime: number = 2
