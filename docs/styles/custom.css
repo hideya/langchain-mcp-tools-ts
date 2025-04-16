@@ -1,0 +1,150 @@
+:root {
+  --theme-color: #4287f5;
+  --text-color-primary: #34495e;
+  --text-color-secondary: #7f8c8d;
+  --border-color: #eaecef;
+  --code-bg-color: #f8f8f8;
+  --header-height: 60px;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Improve sidebar styling */
+.sidebar {
+  background-color: #fafbfc;
+}
+
+.sidebar ul li.active > a {
+  color: var(--theme-color);
+  font-weight: 600;
+}
+
+/* Markdown content styling */
+.markdown-section h1,
+.markdown-section h2,
+.markdown-section h3,
+.markdown-section h4 {
+  color: var(--text-color-primary);
+  font-weight: 600;
+  margin-top: 2rem;
+}
+
+.markdown-section h1 {
+  font-size: 2rem;
+  margin-top: 0;
+}
+
+.markdown-section h2 {
+  font-size: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.markdown-section pre {
+  background-color: var(--code-bg-color);
+  border-radius: 4px;
+}
+
+/* Code blocks */
+.markdown-section code {
+  color: #e96900;
+  background-color: var(--code-bg-color);
+  border-radius: 3px;
+  font-family: 'Roboto Mono', monospace;
+  padding: 0.2em 0.4em;
+}
+
+.markdown-section pre > code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* Tables */
+.markdown-section table {
+  display: table;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  width: 100%;
+}
+
+.markdown-section tr {
+  border-top: 1px solid var(--border-color);
+}
+
+.markdown-section tr:nth-child(2n) {
+  background-color: #f8f8f8;
+}
+
+.markdown-section th {
+  font-weight: 600;
+  padding: 0.6em 1em;
+  border: 1px solid var(--border-color);
+  background-color: #f2f2f2;
+}
+
+.markdown-section td {
+  padding: 0.6em 1em;
+  border: 1px solid var(--border-color);
+}
+
+/* Copy code button styling */
+.docsify-copy-code-button {
+  background: var(--theme-color) !important;
+}
+
+/* Badge styling */
+.badge {
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  border-radius: 3px;
+  font-size: 0.8em;
+  margin-right: 0.5em;
+}
+
+.badge.npm {
+  background: #cb3837;
+  color: white;
+}
+
+.badge.mit {
+  background: #4287f5;
+  color: white;
+}
+
+/* API method styling */
+.api-method {
+  border-left: 4px solid var(--theme-color);
+  padding-left: 1em;
+  margin: 2em 0;
+}
+
+.api-method h3 {
+  margin-top: 0 !important;
+}
+
+.parameter-table td:first-child {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 600;
+}
+
+/* Mobile responsiveness */
+@media screen and (max-width: 768px) {
+  .sidebar {
+    left: -300px;
+  }
+  
+  .content {
+    left: 0;
+    padding-top: 50px;
+  }
+  
+  .markdown-section {
+    padding: 20px 15px;
+  }
+  
+  body.close .sidebar {
+    transform: translateX(300px);
+  }
+}
