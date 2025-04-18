@@ -62,20 +62,20 @@ class TestOAuthProvider implements OAuthClientProvider {
   // Manual code verifier and challenge generation
   generateCodeVerifier() {
     try {
-      console.log('Attempting to generate code verifier with pkceChallenge...');
-      const result = pkceChallenge();
-      console.log('pkceChallenge result:', result);
+      console.log('Generating code verifier...');
+      // Generate a random string for code verifier (PKCE)
+      const randomBytes = new Uint8Array(32);
+      crypto.getRandomValues(randomBytes);
+      const verifier = btoa(String.fromCharCode(...randomBytes))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
       
-      if (result && result.code_verifier) {
-        this._codeVerifier = result.code_verifier;
-        return this._codeVerifier;
-      } else {
-        console.log('pkceChallenge returned an invalid result, using default code verifier');
-        return this._codeVerifier;
-      }
+      this._codeVerifier = verifier;
+      return this._codeVerifier;
     } catch (error) {
       console.error('Error generating code verifier:', error);
-      // Use default code verifier if pkceChallenge fails
+      // Use default code verifier if generation fails
       return this._codeVerifier;
     }
   }
@@ -83,14 +83,7 @@ class TestOAuthProvider implements OAuthClientProvider {
   // Generate a code challenge for PKCE
   async generateCodeChallenge(verifier: string) {
     try {
-      // Preferred approach using pkceChallenge
-      const result = pkceChallenge(verifier);
-      if (result && result.code_challenge) {
-        return result.code_challenge;
-      }
-      
-      // Fallback: simple base64 encode
-      console.log('Falling back to manual code challenge generation');
+      console.log('Generating code challenge for verifier...');
       const encoder = new TextEncoder();
       const data = encoder.encode(verifier);
       const digest = await crypto.subtle.digest('SHA-256', data);
@@ -109,21 +102,27 @@ class TestOAuthProvider implements OAuthClientProvider {
 
   // Request client information from the server
   async requestClientInfo(registerUrl: string) {
-    const response = await fetch(registerUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(this._clientMetadata)
-    });
+    console.log(`Requesting client info from: ${registerUrl}`);
+    try {
+      const response = await fetch(registerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(this._clientMetadata)
+      });
 
-    if (!response.ok) {
-      throw new Error(`Client registration failed: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Client registration failed: ${response.status}`);
+      }
+
+      const clientInfo = await response.json();
+      this._clientInfo = clientInfo;
+      return clientInfo;
+    } catch (error) {
+      console.error(`Error requesting client info: ${error.message}`);
+      throw error;
     }
-
-    const clientInfo = await response.json();
-    this._clientInfo = clientInfo;
-    return clientInfo;
   }
 
   // Set tokens directly (for testing)
@@ -134,6 +133,20 @@ class TestOAuthProvider implements OAuthClientProvider {
 
 async function main() {
   console.log('Initializing secure MCP tools...');
+
+  // Define the server base URL - use a specific IPv4 address
+  const SERVER_URL = 'http://127.0.0.1:3333';
+  
+  // Check if server is running
+  try {
+    console.log(`Checking if server is available at ${SERVER_URL}...`);
+    const response = await fetch(SERVER_URL);
+    console.log(`Server responded with status: ${response.status}`);
+  } catch (error) {
+    console.error(`Error connecting to server: ${error.message}`);
+    console.error('Please make sure the server is running at', SERVER_URL);
+    return;
+  }
 
   // Create our OAuth provider
   const authProvider = new TestOAuthProvider({
@@ -150,7 +163,7 @@ async function main() {
     try {
       await convertMcpToLangchainTools({
         secureServer: {
-          url: 'http://localhost:3333/sse',
+          url: `${SERVER_URL}/sse`,
           sseOptions: {
             authProvider,
             requestInit: {
@@ -170,39 +183,25 @@ async function main() {
     
     // Step 1: Register the client and get client info
     console.log('Registering client...');
-    const clientInfo = await authProvider.requestClientInfo('http://localhost:3333/register');
+    const clientInfo = await authProvider.requestClientInfo(`${SERVER_URL}/register`);
     console.log('Client information received:');
     console.log(`- Client ID: ${clientInfo.client_id}`);
     console.log(`- Client Secret: ${clientInfo.client_secret ? '[PRESENT]' : '[MISSING]'}`);
     
     // Step 2: Generate code verifier for PKCE with error handling
     console.log('Generating code verifier...');
-    let codeVerifier;
-    try {
-      codeVerifier = authProvider.generateCodeVerifier();
-      console.log('Code verifier type:', typeof codeVerifier);
-      console.log(`Code verifier generated: ${codeVerifier ? codeVerifier.substring(0, 10) + '...' : 'undefined or null'}`);
-    } catch (error) {
-      console.error('Error in code verifier generation:', error);
-      codeVerifier = 'default_code_verifier_for_testing_123456789012345678901234567890';
-      console.log(`Using fallback code verifier: ${codeVerifier.substring(0, 10)}...`);
-    }
+    let codeVerifier = authProvider.generateCodeVerifier();
+    console.log('Code verifier type:', typeof codeVerifier);
+    console.log(`Code verifier generated: ${codeVerifier.substring(0, 10)}...`);
     
     // Step 3: Simulate authorization redirect
     console.log('\n========== AUTHORIZATION REQUIRED ==========');
     console.log('In a real application, the user would be redirected to:');
     
-    let codeChallenge;
-    try {
-      codeChallenge = await authProvider.generateCodeChallenge(codeVerifier);
-      console.log(`Code challenge generated: ${codeChallenge}`);
-    } catch (error) {
-      console.error('Error generating code challenge:', error);
-      codeChallenge = 'fallback_code_challenge';
-      console.log(`Using fallback code challenge: ${codeChallenge}`);
-    }
+    let codeChallenge = await authProvider.generateCodeChallenge(codeVerifier);
+    console.log(`Code challenge generated: ${codeChallenge}`);
     
-    const authUrl = new URL('http://localhost:3333/authorize');
+    const authUrl = new URL(`${SERVER_URL}/authorize`);
     authUrl.searchParams.append('response_type', 'code');
     authUrl.searchParams.append('client_id', clientInfo.client_id);
     authUrl.searchParams.append('code_challenge', codeChallenge);
@@ -247,33 +246,67 @@ async function main() {
     // Add a delay to ensure the server is ready
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const tools = await convertMcpToLangchainTools({
-      secureServer: {
-        url: 'http://localhost:3333/sse',
-        sseOptions: {
-          authProvider,
-          requestInit: {
-            headers: {
-              'X-Test-Header': 'test-value'
+    // Set a timeout for the connection attempt
+    const connectionPromise = new Promise(async (resolve, reject) => {
+      try {
+        // Create the connection with a longer timeout
+        const tools = await convertMcpToLangchainTools({
+          secureServer: {
+            url: `${SERVER_URL}/sse`,
+            sseOptions: {
+              authProvider,
+              requestInit: {
+                headers: {
+                  'X-Test-Header': 'test-value'
+                }
+              },
+              debug: true // Enable debug mode
             }
           }
+        });
+        
+        console.log('Connection successful!');
+        console.log('Available tools:', Object.keys(tools.secureServer));
+        
+        // Test the echo method
+        try {
+          console.log('Testing echo method...');
+          const echo = tools.secureServer.echo;
+          
+          if (!echo) {
+            console.error('Echo tool not found in available tools');
+            reject(new Error('Echo tool not found'));
+            return;
+          }
+          
+          const echoResult = await echo.invoke({ message: 'Hello, authenticated MCP!' });
+          console.log('Echo response:', echoResult);
+          console.log('Test completed successfully!');
+          resolve(tools);
+        } catch (error) {
+          console.error('Error calling echo method:', error);
+          reject(error);
         }
+      } catch (error) {
+        console.error('Connection failed:', error);
+        reject(error);
       }
     });
     
-    console.log('Connection successful!');
-    console.log('Available tools:', Object.keys(tools.secureServer));
+    // Set a timeout for the connection
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        console.log('Connection is taking longer than expected, but still trying...');
+        
+        // Give it another 60 seconds
+        setTimeout(() => {
+          reject(new Error('Connection timed out after 120 seconds'));
+        }, 60000);
+      }, 60000);
+    });
     
-    // Test the echo method
-    try {
-      console.log('Testing echo method...');
-      const echo = tools.secureServer.echo;
-      const echoResult = await echo.invoke({ message: 'Hello, authenticated MCP!' });
-      console.log('Echo response:', echoResult);
-      console.log('Test completed successfully!');
-    } catch (error) {
-      console.error('Error calling echo method:', error);
-    }
+    // Wait for either the connection to succeed or the timeout
+    await Promise.race([connectionPromise, timeoutPromise]);
     
   } catch (error) {
     console.error('Error during authentication or retry:', error);
