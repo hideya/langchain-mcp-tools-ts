@@ -1,6 +1,10 @@
 import * as child_process from 'child_process';
 import * as net from 'net';
 
+// NOTE: Hard-coded dependency on the Supergateway message
+// to easily identify the end of initialization.
+const SUPERGATEWAY_READY_MESSAGE = "[supergateway] Listening on port"
+
 /**
  * Find and return a free port on localhost.
  * @returns A Promise resolving to an available port number
@@ -27,13 +31,11 @@ export async function findFreePort(): Promise<number> {
  *
  * @param transportType - The transport type, either 'SSE' or 'WS'
  * @param mcpServerRunCommand - The command to run the MCP server
- * @param waitTime - Time to wait for the server to start listening on its port
  * @returns A Promise resolving to [serverProcess, serverPort]
  */
 export async function startRemoteMcpServerLocally(
   transportType: string,
-  mcpServerRunCommand: string,
-  waitTime: number = 2
+  mcpServerRunCommand: string
 ): Promise<[child_process.ChildProcess, number]> {
   const serverPort = await findFreePort();
 
@@ -63,19 +65,51 @@ export async function startRemoteMcpServerLocally(
     throw new Error(`Unsupported transport type: ${transportType}`);
   }
 
-  // Start the server process
+  // Start the server process with stdout/stderr piped
   const serverProcess = child_process.spawn(
     command[0],
     command.slice(1),
     {
-      stdio: ['inherit', 'inherit', 'inherit'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     }
   );
 
-  console.log(`Started ${transportType.toUpperCase()} MCP Server Process with PID: ${serverProcess.pid}`);
+  console.log(`Starting ${transportType.toUpperCase()} MCP Server Process with PID: ${serverProcess.pid}`);
   
-  // Wait until the server starts listening on the port
-  await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+  // Return a promise that resolves when the server is ready
+  return new Promise((resolve, reject) => {
+    // Set a reasonable timeout as fallback (30 seconds)
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Timed out waiting for ${transportType.toUpperCase()} server to start`));
+    }, 30000);
+    
+    // Listen for the specific log message that indicates server is ready
+    serverProcess.stdout?.on('data', (data) => {
+      const output = data.toString();
+      console.log(output); // Still log the output to console
 
-  return [serverProcess, serverPort];
+      if (output.includes(SUPERGATEWAY_READY_MESSAGE)) {
+        clearTimeout(timeoutId);
+        console.log(`${transportType.toUpperCase()} MCP Server is ready on port ${serverPort}`);
+        resolve([serverProcess, serverPort]);
+      }
+    });
+
+    // Handle errors
+    serverProcess.stderr?.on('data', (data) => {
+      console.error(`Server error: ${data}`);
+    });
+
+    serverProcess.on('error', (err) => {
+      clearTimeout(timeoutId);
+      reject(new Error(`Failed to start server: ${err.message}`));
+    });
+
+    serverProcess.on('exit', (code) => {
+      if (code !== 0 && code !== null) {
+        clearTimeout(timeoutId);
+        reject(new Error(`Server process exited with code ${code}`));
+      }
+    });
+  });
 }
