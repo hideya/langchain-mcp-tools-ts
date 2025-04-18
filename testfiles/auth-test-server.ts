@@ -1,382 +1,304 @@
 import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
-import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
+import { URL } from 'url';
 
-// Setup the Express server
 const app = express();
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+const PORT = 3333;
+
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Simple in-memory token management
-const validTokens = new Set<string>();
-const activeClients = new Map<string, express.Response>();
+// Store active SSE sessions
+const sessions = new Map();
 
-// Very basic auth token validation middleware
-const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+// Store registered clients
+const clients = new Map();
 
-  console.log(`\nAuth check - Header: ${authHeader}`);
-  
-  if (!token) {
+// Basic auth middleware
+function checkAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  console.log('Auth check - Header:', authHeader);
+
+  if (!authHeader) {
     console.log('No token provided');
-    return res.status(401).json({ error: 'Unauthorized - No token provided' });
-  }
-  
-  // For testing purposes, let's accept any token prefixed with "test_"
-  if (token.startsWith('test_')) {
-    console.log('Accept test token for development');
-    validTokens.add(token);
-    next();
-    return;
+    return next();
   }
 
-  if (!validTokens.has(token)) {
-    console.log('Invalid token');
-    return res.status(401).json({ error: 'Unauthorized - Invalid token' });
-  }
-  
-  console.log('Valid token - access granted');
-  next();
-};
-
-// OAuth token endpoint
-app.post('/token', (req, res) => {
-  console.log('\nToken request received:');
-  console.log(req.body);
-  
-  const { grant_type, client_id, code, code_verifier, refresh_token } = req.body;
-
-  // Handle authorization code exchange
-  if (grant_type === 'authorization_code' && code && code_verifier) {
-    // In a real implementation, you would validate the code and code_verifier
-    // For this example, we'll accept any code that starts with "valid_"
-    if (code.startsWith('valid_')) {
-      // For testing, use a consistent token for easier debugging
-      const token = `test_token_${client_id}`;
-      validTokens.add(token);
-      
-      console.log(`Issuing access token: ${token} (valid tokens: ${validTokens.size})`);
-      
-      return res.json({
-        access_token: token,
-        token_type: 'Bearer',
-        expires_in: 3600,
-        refresh_token: `refresh_${token}`
-      });
+  if (authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    
+    // Check if it's our test token
+    if (token.startsWith('test_token_client_')) {
+      console.log('Accept test token for development');
+      return next();
     }
   }
-  
-  // Handle refresh token
-  if (grant_type === 'refresh_token' && refresh_token) {
-    // In a real implementation, you would validate the refresh token
-    // For this example, we'll accept any refresh token that starts with "refresh_"
-    if (refresh_token.startsWith('refresh_')) {
-      // For testing, use a consistent token
-      const token = `test_refreshed_${client_id}`;
-      validTokens.add(token);
-      
-      return res.json({
-        access_token: token,
-        token_type: 'Bearer',
-        expires_in: 3600,
-        refresh_token: `refresh_${token}`
-      });
-    }
-  }
-  
-  console.log('Invalid token request');
-  res.status(400).json({ error: 'invalid_grant' });
-});
 
-// OAuth authorization endpoint
-app.get('/authorize', (req, res) => {
-  const { client_id, redirect_uri, code_challenge, code_challenge_method, response_type } = req.query;
-  
-  // In a real implementation, you would validate these parameters
-  console.log('Authorization request received:');
-  console.log('- Client ID:', client_id);
-  console.log('- Redirect URI:', redirect_uri);
-  console.log('- Code Challenge:', code_challenge);
-  
-  // For our test purposes, we'll simulate the user consent page
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Test OAuth Consent</title>
-      <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        button { padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; }
-      </style>
-    </head>
-    <body>
-      <h1>Test OAuth Consent</h1>
-      <p>This is a simulated OAuth consent screen. In a real application, the user would grant or deny access here.</p>
-      <p>Client ID: ${client_id}</p>
-      <p>For testing, click the button below to simulate granting access:</p>
-      <form method="POST" action="/authorize/grant">
-        <input type="hidden" name="client_id" value="${client_id}" />
-        <input type="hidden" name="redirect_uri" value="${redirect_uri}" />
-        <input type="hidden" name="code_challenge" value="${code_challenge}" />
-        <button type="submit">Grant Access</button>
-      </form>
-    </body>
-    </html>
-  `);
-});
-
-// Handle the OAuth consent form submission
-app.post('/authorize/grant', (req, res) => {
-  const { client_id, redirect_uri } = req.body;
-  
-  // Generate a valid authorization code
-  const code = 'valid_auth_code_123';
-  
-  // Redirect the user back to the client's redirect URI with the code
-  const redirectUrl = new URL(redirect_uri as string);
-  redirectUrl.searchParams.set('code', code);
-  
-  console.log('Redirecting to:', redirectUrl.toString());
-  res.redirect(redirectUrl.toString());
-});
-
-// OAuth authorization server metadata
-app.get('/.well-known/oauth-authorization-server', (req, res) => {
-  const port = process.env.PORT || 3333;
-  
-  res.json({
-    issuer: `http://localhost:${port}/`,
-    authorization_endpoint: `http://localhost:${port}/authorize`,
-    token_endpoint: `http://localhost:${port}/token`,
-    registration_endpoint: `http://localhost:${port}/register`,
-    response_types_supported: ['code'],
-    code_challenge_methods_supported: ['S256'],
-    grant_types_supported: ['authorization_code', 'refresh_token']
-  });
-});
+  res.status(401).json({ error: 'Unauthorized' });
+}
 
 // Client registration endpoint
 app.post('/register', (req, res) => {
-  const { client_name, redirect_uris } = req.body;
-  
+  const clientData = req.body;
   console.log('Client registration request:');
-  console.log(req.body);
-  
-  if (!client_name || !redirect_uris || !Array.isArray(redirect_uris) || redirect_uris.length === 0) {
-    console.log('Invalid client metadata');
-    return res.status(400).json({ error: 'invalid_client_metadata' });
-  }
-  
-  const clientId = `client_${uuidv4().substring(0, 8)}`;
+  console.log(clientData);
+
+  // Generate a simple client ID
+  const clientId = `client_${Math.random().toString(16).substring(2, 10)}`;
   const clientSecret = uuidv4();
-  
-  console.log(`Registered client: ${clientId}`);
-  
-  res.status(201).json({
+
+  const clientInfo = {
     client_id: clientId,
     client_secret: clientSecret,
     client_id_issued_at: Math.floor(Date.now() / 1000),
-    client_secret_expires_at: 0, // Never expires
-    client_name,
-    redirect_uris
+    client_secret_expires_at: 0,
+    ...clientData
+  };
+
+  clients.set(clientId, clientInfo);
+  console.log(`Registered client: ${clientId}`);
+
+  res.json(clientInfo);
+});
+
+// OAuth authorization endpoint (simplified for testing)
+app.get('/authorize', (req, res) => {
+  const { client_id, redirect_uri, code_challenge } = req.query;
+  
+  // For testing, just redirect with a test code
+  const redirectUrl = new URL(redirect_uri as string);
+  redirectUrl.searchParams.append('code', 'valid_auth_code_123');
+  
+  res.redirect(redirectUrl.toString());
+});
+
+// OAuth token endpoint
+app.post('/token', (req, res) => {
+  const { grant_type, client_id, code, code_verifier } = req.body;
+  
+  // For testing, always return tokens
+  res.json({
+    access_token: `test_token_${client_id}`,
+    token_type: 'Bearer',
+    expires_in: 3600,
+    refresh_token: `refresh_test_token_${client_id}`
   });
 });
 
-// SSE endpoint - super simplified
-app.get('/sse', authenticateToken, (req, res) => {
+// SSE endpoint with auth
+app.get('/sse', checkAuth, (req, res) => {
+  if (!req.headers.authorization) {
+    return res.status(401).send('Unauthorized');
+  }
+
+  // Set up SSE connection
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  // Create a unique session ID
   const sessionId = uuidv4();
-  console.log(`\nSSE connection established with sessionId: ${sessionId}`);
   
-  // Set up headers for SSE
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
-  });
+  // Store the session
+  sessions.set(sessionId, { req, res, lastPingTime: Date.now() });
   
-  // Initial keepalive
-  res.write(':keepalive\n\n');
+  console.log(`SSE connection established with sessionId: ${sessionId}`);
   
-  // Generate the message endpoint URL
-  const protocol = req.protocol;
-  const host = req.get('host') || 'localhost:3333';
-  const messageEndpoint = `${protocol}://${host}/message?sessionId=${sessionId}`;
+  // Send the session ID to the client
+  res.write(`data: ${JSON.stringify({ sessionId })}\n\n`);
   
-  // Send the endpoint event in the expected format
-  res.write(`event: endpoint\ndata: ${messageEndpoint}\n\n`);
-  
-  // Store the response object for sending messages later
-  activeClients.set(sessionId, res);
-  
-  // Keep connection alive with periodic pings
-  const pingInterval = setInterval(() => {
-    if (activeClients.has(sessionId)) {
-      res.write(':ping\n\n');
-    } else {
-      clearInterval(pingInterval);
-    }
-  }, 30000); // Every 30 seconds
-  
-  // Handle client disconnect
+  // Handle client disconnection
   req.on('close', () => {
     console.log(`Client disconnected, removing session ${sessionId}`);
-    activeClients.delete(sessionId);
-    clearInterval(pingInterval);
+    sessions.delete(sessionId);
   });
 });
 
-// Message endpoint - handle all types of requests directly
-app.post('/message', authenticateToken, async (req, res) => {
-  const sessionId = req.query.sessionId as string;
+// Handle SSE messages
+app.post('/sse/:sessionId', checkAuth, express.text({ type: '*/*' }), (req, res) => {
+  const { sessionId } = req.params;
+  const message = req.body;
   
-  if (!sessionId) {
-    console.log('Missing session ID in request');
-    return res.status(400).json({
-      jsonrpc: '2.0',
-      id: req.body?.id || null,
-      error: {
-        code: -32000,
-        message: 'Missing session ID'
-      }
-    });
+  console.log(`Received message for session ${sessionId}: ${message}`);
+  
+  if (sessions.has(sessionId)) {
+    handleSSEMessage(sessionId, message);
+    res.sendStatus(200);
+  } else {
+    console.log(`Session ${sessionId} not found`);
+    res.status(404).send('Session not found');
   }
-  
-  if (!activeClients.has(sessionId)) {
-    console.log(`No active client found for session ${sessionId}`);
-    return res.status(400).json({
-      jsonrpc: '2.0',
-      id: req.body?.id || null,
-      error: {
-        code: -32000,
-        message: 'No active client for this session'
-      }
-    });
-  }
-  
-  console.log(`Received message for session ${sessionId}:`, req.body?.method);
-  
-  // Handle initialize request
-  if (req.body.method === 'initialize') {
-    console.log('Handling initialize request');
-    return res.json({
-      jsonrpc: '2.0',
-      id: req.body.id,
-      result: {
-        server: {
-          name: "Test Auth MCP Server",
-          version: "1.0.0",
-        },
-        protocol_version: req.body.params?.protocolVersion || '2024-11-05',
-        capabilities: {
-          tools: {}
-        }
-      }
-    });
-  }
-  
-  // Handle tools/list request
-  if (req.body.method === 'tools/list') {
-    console.log('Handling tools/list request');
-    return res.json({
-      jsonrpc: '2.0',
-      id: req.body.id,
-      result: {
-        tools: [
-          {
-            name: 'greet',
-            description: 'Greet someone by name',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                name: {
-                  type: 'string',
-                  description: 'Name of the person to greet'
-                }
-              },
-              required: ['name']
-            }
-          },
-          {
-            name: 'getCurrentTime',
-            description: 'Get the current server time',
-            inputSchema: {
-              type: 'object',
-              properties: {}
-            }
-          }
-        ]
-      }
-    });
-  }
-  
-  // Handle tools/call request
-  if (req.body.method === 'tools/call') {
-    console.log(`Handling tools/call request: ${req.body.params.name}`);
-    const toolName = req.body.params.name;
-    const args = req.body.params.arguments;
-    
-    if (toolName === 'greet') {
-      return res.json({
-        jsonrpc: '2.0',
-        id: req.body.id,
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: `Hello, ${args.name}! Welcome to the secure MCP server.`
-            }
-          ]
-        }
-      });
-    }
-    
-    if (toolName === 'getCurrentTime') {
-      return res.json({
-        jsonrpc: '2.0',
-        id: req.body.id,
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: `The current server time is: ${new Date().toLocaleString()}`
-            }
-          ]
-        }
-      });
-    }
-    
-    return res.status(400).json({
-      jsonrpc: '2.0',
-      id: req.body.id,
-      error: {
-        code: -32601,
-        message: `Tool not found: ${toolName}`
-      }
-    });
-  }
-  
-  // For any other method, return a generic success
-  return res.json({
-    jsonrpc: '2.0',
-    id: req.body.id || null,
-    result: {}
-  });
 });
+
+// Function to handle SSE messages
+function handleSSEMessage(sessionId, message) {
+  console.log(`Processing message for session ${sessionId}: ${message}`);
+  
+  try {
+    const parsed = JSON.parse(message);
+    
+    if (parsed.method === "initialize") {
+      console.log("Handling initialize request with ID:", parsed.id);
+      
+      // Respond with proper MCP initialize response
+      const response = {
+        jsonrpc: "2.0",
+        id: parsed.id,
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: {
+            tools: { listChanged: true },
+            resources: { listChanged: true, subscribe: true },
+            prompts: { listChanged: true },
+            logging: true
+          },
+          serverInfo: {
+            name: "MCP SSE Auth Test Server",
+            version: "1.0.0"
+          },
+          tools: [
+            {
+              name: "echo",
+              description: "Echo back the input",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  message: {
+                    type: "string",
+                    description: "Message to echo back"
+                  }
+                },
+                required: ["message"]
+              }
+            },
+            {
+              name: "getServerInfo",
+              description: "Get server information",
+              inputSchema: {
+                type: "object",
+                properties: {},
+                required: []
+              }
+            }
+          ]
+        }
+      };
+      
+      console.log("Sending initialize response:", JSON.stringify(response));
+      sendSSEMessage(sessionId, JSON.stringify(response));
+    } 
+    else if (parsed.method === "echo") {
+      console.log("Handling echo request with ID:", parsed.id);
+      
+      // Simple echo method implementation
+      const response = {
+        jsonrpc: "2.0",
+        id: parsed.id,
+        result: parsed.params
+      };
+      
+      sendSSEMessage(sessionId, JSON.stringify(response));
+    }
+    else if (parsed.method === "getServerInfo") {
+      console.log("Handling getServerInfo request with ID:", parsed.id);
+      
+      // Simple server info implementation
+      const response = {
+        jsonrpc: "2.0",
+        id: parsed.id,
+        result: {
+          name: "MCP SSE Auth Test Server",
+          version: "1.0.0",
+          uptime: process.uptime()
+        }
+      };
+      
+      sendSSEMessage(sessionId, JSON.stringify(response));
+    }
+    else {
+      console.log(`Unknown method: ${parsed.method}`);
+      
+      // Return error for unknown methods
+      const response = {
+        jsonrpc: "2.0",
+        id: parsed.id,
+        error: {
+          code: -32601,
+          message: `Method not found: ${parsed.method}`
+        }
+      };
+      
+      sendSSEMessage(sessionId, JSON.stringify(response));
+    }
+  } catch (error) {
+    console.error(`Error handling message: ${error.message}`);
+    
+    try {
+      const parsed = JSON.parse(message);
+      // Send error response
+      const errorResponse = {
+        jsonrpc: "2.0",
+        id: parsed.id || null,
+        error: {
+          code: -32000,
+          message: `Internal error: ${error.message}`
+        }
+      };
+      
+      sendSSEMessage(sessionId, JSON.stringify(errorResponse));
+    } catch (parseError) {
+      console.error("Could not parse message to send error response");
+    }
+  }
+}
+
+// Function to send SSE messages
+function sendSSEMessage(sessionId, data) {
+  const session = sessions.get(sessionId);
+  if (session) {
+    try {
+      // Format the data as an SSE event with proper formatting
+      session.res.write(`data: ${data}\n\n`);
+      // Update ping time
+      session.lastPingTime = Date.now();
+      console.log(`Sent SSE message to ${sessionId}`);
+    } catch (error) {
+      console.error(`Error sending SSE message: ${error.message}`);
+      // Remove the session if we can't send to it
+      sessions.delete(sessionId);
+    }
+  } else {
+    console.error(`Session ${sessionId} not found when trying to send message`);
+  }
+}
+
+// Ping function to keep connections alive
+function pingAllSessions() {
+  console.log(`Pinging ${sessions.size} active sessions`);
+  
+  for (const [sessionId, session] of sessions.entries()) {
+    try {
+      // Send a ping every 30 seconds
+      if (Date.now() - session.lastPingTime > 30000) {
+        session.res.write(`: ping ${new Date().toISOString()}\n\n`);
+        session.lastPingTime = Date.now();
+      }
+    } catch (error) {
+      console.error(`Error pinging session ${sessionId}: ${error.message}`);
+      sessions.delete(sessionId);
+    }
+  }
+}
+
+// Set up ping interval for keepalive
+setInterval(pingAllSessions, 15000);
 
 // Start the server
-const port = process.env.PORT || 3333;
-app.listen(port, () => {
-  console.log(`Auth test MCP server running at http://localhost:${port}`);
-  console.log(`SSE endpoint: http://localhost:${port}/sse`);
-  console.log(`\nFor testing, use these commands:`);
-  console.log(`1. To run server: npm run auth-test-server`);
-  console.log(`2. To run auth example: npm run auth-example`);
+app.listen(PORT, () => {
+  console.log(`Auth test MCP server running at http://localhost:${PORT}`);
+  console.log(`SSE endpoint: http://localhost:${PORT}/sse`);
+  console.log('\nFor testing, use these commands:');
+  console.log('1. To run server: npm run auth-test-server');
+  console.log('2. To run auth example: npm run auth-example');
 });
