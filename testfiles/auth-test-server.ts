@@ -1,13 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  JSONRPCMessageSchema
-} from "@modelcontextprotocol/sdk/types.js";
+import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 
 // Setup the Express server
 const app = express();
@@ -21,80 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Simple in-memory token management
 const validTokens = new Set<string>();
-const activeTransports = new Map<string, SSEServerTransport>();
-
-// Create a shared server instance
-const server = new Server(
-  {
-    name: "Test Auth MCP Server",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  }
-);
-
-// Configure server tools
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  console.log("Handling tools/list request");
-  return {
-    tools: [
-      {
-        name: "greet",
-        description: "Greet someone by name",
-        inputSchema: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "Name of the person to greet"
-            }
-          },
-          required: ["name"]
-        }
-      },
-      {
-        name: "getCurrentTime",
-        description: "Get the current server time",
-        inputSchema: {
-          type: "object",
-          properties: {}
-        }
-      }
-    ]
-  };
-});
-
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  console.log(`Handling tool call: ${request.params.name}`, request.params.arguments);
-  
-  switch (request.params.name) {
-    case "greet":
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Hello, ${request.params.arguments.name}! Welcome to the secure MCP server.`
-          }
-        ]
-      };
-      
-    case "getCurrentTime":
-      return {
-        content: [
-          {
-            type: "text",
-            text: `The current server time is: ${new Date().toLocaleString()}`
-          }
-        ]
-      };
-      
-    default:
-      throw new Error(`Unknown tool: ${request.params.name}`);
-  }
-});
+const activeClients = new Map<string, express.Response>();
 
 // Very basic auth token validation middleware
 const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -268,16 +189,10 @@ app.post('/register', (req, res) => {
   });
 });
 
-// SSE endpoint with proper connection handling
+// SSE endpoint - super simplified
 app.get('/sse', authenticateToken, (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  console.log(`\nSSE connection established with token: ${token}`);
-  
-  // Generate a session ID
   const sessionId = uuidv4();
-  console.log(`Creating SSE transport with session ID: ${sessionId}`);
+  console.log(`\nSSE connection established with sessionId: ${sessionId}`);
   
   // Set up headers for SSE
   res.writeHead(200, {
@@ -287,47 +202,38 @@ app.get('/sse', authenticateToken, (req, res) => {
     'Access-Control-Allow-Origin': '*'
   });
   
-  // Send initial keepalive
+  // Initial keepalive
   res.write(':keepalive\n\n');
   
-  // Creating the message endpoint URL (pass the session ID as a query parameter)
+  // Generate the message endpoint URL
   const protocol = req.protocol;
   const host = req.get('host') || 'localhost:3333';
   const messageEndpoint = `${protocol}://${host}/message?sessionId=${sessionId}`;
   
-  // Send the endpoint URL to the client
+  // Send the endpoint event in the expected format
   res.write(`event: endpoint\ndata: ${messageEndpoint}\n\n`);
   
-  // Create an SSE transport
-  const transport = new SSEServerTransport('/message', res);
+  // Store the response object for sending messages later
+  activeClients.set(sessionId, res);
   
-  // Store the transport (we don't really need this, but keep it for cleanliness)
-  activeTransports.set(sessionId, transport);
-  
-  // Connect the server to this transport (don't await to avoid header issues)
-  server.connect(transport)
-    .then(() => {
-      console.log(`Server connected to transport ${sessionId}`);
-    })
-    .catch(error => {
-      console.error(`Error connecting server to transport:`, error);
-      activeTransports.delete(sessionId);
-    });
+  // Keep connection alive with periodic pings
+  const pingInterval = setInterval(() => {
+    if (activeClients.has(sessionId)) {
+      res.write(':ping\n\n');
+    } else {
+      clearInterval(pingInterval);
+    }
+  }, 30000); // Every 30 seconds
   
   // Handle client disconnect
   req.on('close', () => {
     console.log(`Client disconnected, removing session ${sessionId}`);
-    const transport = activeTransports.get(sessionId);
-    if (transport) {
-      transport.close().catch(err => {
-        console.error(`Error closing transport:`, err);
-      });
-      activeTransports.delete(sessionId);
-    }
+    activeClients.delete(sessionId);
+    clearInterval(pingInterval);
   });
 });
 
-// Message endpoint that routes to the SSEServerTransport
+// Message endpoint - handle all types of requests directly
 app.post('/message', authenticateToken, async (req, res) => {
   const sessionId = req.query.sessionId as string;
   
@@ -343,12 +249,24 @@ app.post('/message', authenticateToken, async (req, res) => {
     });
   }
   
-  console.log(`Received message for session ${sessionId}:`, JSON.stringify(req.body).substring(0, 100) + '...');
+  if (!activeClients.has(sessionId)) {
+    console.log(`No active client found for session ${sessionId}`);
+    return res.status(400).json({
+      jsonrpc: '2.0',
+      id: req.body?.id || null,
+      error: {
+        code: -32000,
+        message: 'No active client for this session'
+      }
+    });
+  }
   
-  // This is a specific response for the initialize request to avoid transport issues
+  console.log(`Received message for session ${sessionId}:`, req.body?.method);
+  
+  // Handle initialize request
   if (req.body.method === 'initialize') {
-    console.log('Handling initialize request directly');
-    return res.status(200).json({
+    console.log('Handling initialize request');
+    return res.json({
       jsonrpc: '2.0',
       id: req.body.id,
       result: {
@@ -364,10 +282,10 @@ app.post('/message', authenticateToken, async (req, res) => {
     });
   }
   
-  // This is a specific response for the tools/list request
+  // Handle tools/list request
   if (req.body.method === 'tools/list') {
-    console.log('Handling tools/list request directly');
-    return res.status(200).json({
+    console.log('Handling tools/list request');
+    return res.json({
       jsonrpc: '2.0',
       id: req.body.id,
       result: {
@@ -399,14 +317,14 @@ app.post('/message', authenticateToken, async (req, res) => {
     });
   }
   
-  // Handle tool call request
+  // Handle tools/call request
   if (req.body.method === 'tools/call') {
-    console.log(`Handling tool call directly: ${req.body.params.name}`);
+    console.log(`Handling tools/call request: ${req.body.params.name}`);
     const toolName = req.body.params.name;
     const args = req.body.params.arguments;
     
     if (toolName === 'greet') {
-      return res.status(200).json({
+      return res.json({
         jsonrpc: '2.0',
         id: req.body.id,
         result: {
@@ -421,7 +339,7 @@ app.post('/message', authenticateToken, async (req, res) => {
     }
     
     if (toolName === 'getCurrentTime') {
-      return res.status(200).json({
+      return res.json({
         jsonrpc: '2.0',
         id: req.body.id,
         result: {
@@ -445,10 +363,10 @@ app.post('/message', authenticateToken, async (req, res) => {
     });
   }
   
-  // For any other message type, return a generic success
-  return res.status(200).json({
+  // For any other method, return a generic success
+  return res.json({
     jsonrpc: '2.0',
-    id: req.body.id,
+    id: req.body.id || null,
     result: {}
   });
 });
