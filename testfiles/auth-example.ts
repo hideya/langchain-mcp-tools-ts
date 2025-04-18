@@ -2,6 +2,9 @@ import { convertMcpToLangchainTools } from '../src/langchain-mcp-tools';
 import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import pkceChallenge from 'pkce-challenge';
 
+// Enable more verbose logging for debugging
+process.env.MCP_DEBUG = 'true';
+
 // Create a class that implements the OAuthClientProvider interface
 class TestOAuthProvider implements OAuthClientProvider {
   private _clientInfo: any = null;
@@ -131,8 +134,97 @@ class TestOAuthProvider implements OAuthClientProvider {
   }
 }
 
+// Debug helper to log all messages exchanged with the server
+const logAllMessages = (enabled = true) => {
+  if (enabled) {
+    const originalFetch = global.fetch;
+    global.fetch = async function(...args) {
+      console.log('MCP fetch request:', args[0], args[1]?.method);
+      if (args[1]?.body) {
+        try {
+          const body = JSON.parse(args[1].body);
+          console.log('Request body:', body);
+        } catch (e) {
+          console.log('Request body (raw):', args[1].body);
+        }
+      }
+      
+      const response = await originalFetch(...args);
+      
+      // Clone the response to read it without consuming it
+      const clonedResponse = response.clone();
+      try {
+        const text = await clonedResponse.text();
+        console.log('Response:', text);
+      } catch (e) {
+        console.log('Could not read response');
+      }
+      
+      return response;
+    };
+  }
+};
+
+// Connect with authentication
+const connectWithAuth = async (authProvider) => {
+  console.log('Connecting with auth token...');
+  
+  try {
+    const tools = await convertMcpToLangchainTools({
+      servers: {
+        secureServer: {
+          url: 'http://127.0.0.1:3333/sse',
+          sseOptions: {
+            authProvider: authProvider,
+            requestInit: {
+              headers: {
+                'X-Test-Header': 'test-value',
+              },
+            },
+            debug: true,
+          },
+        },
+      },
+      // Add a shorter timeout to fail faster during testing
+      initializationTimeout: 20000, // 20 seconds instead of default 60
+    });
+    
+    console.log('Connection successful! Available tools:', 
+      Object.keys(tools.secureServer).join(', '));
+      
+    // Test a tool to verify everything is working
+    if (tools.secureServer && tools.secureServer.echo) {
+      console.log('Testing echo tool...');
+      const result = await tools.secureServer.echo.invoke({ message: 'Hello from authenticated client!' });
+      console.log('Echo result:', result);
+    } else {
+      console.log('No echo tool available');
+    }
+    
+    return tools;
+  } catch (error) {
+    console.error('Connection failed:', error);
+    
+    // More detailed error information for debugging
+    if (error.details) {
+      console.error('Detailed error:', error.details);
+      
+      // Check for specific error types
+      if (error.details.code === -32001) {
+        console.error('Timeout error - the server might not be responding to all required messages');
+        console.error('Check that your server implements all necessary MCP protocol methods');
+      }
+    }
+    
+    throw error;
+  }
+};
+
 async function main() {
   console.log('Initializing secure MCP tools...');
+  
+  // Enable message logging
+  logAllMessages();
 
   // Define the server base URL - use a specific IPv4 address
   const SERVER_URL = 'http://127.0.0.1:3333';
@@ -162,16 +254,18 @@ async function main() {
     console.log('Attempting initial connection (expected to fail)...');
     try {
       await convertMcpToLangchainTools({
-        secureServer: {
-          url: `${SERVER_URL}/sse`,
-          sseOptions: {
-            authProvider,
-            requestInit: {
-              headers: {
-                'X-Test-Header': 'test-value'
+        servers: {
+          secureServer: {
+            url: `${SERVER_URL}/sse`,
+            sseOptions: {
+              authProvider,
+              requestInit: {
+                headers: {
+                  'X-Test-Header': 'test-value'
+                }
               }
-            }
-          }
+            },
+          },
         }
       });
     } catch (error) {
@@ -246,67 +340,11 @@ async function main() {
     // Add a delay to ensure the server is ready
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Set a timeout for the connection attempt
-    const connectionPromise = new Promise(async (resolve, reject) => {
-      try {
-        // Create the connection with a longer timeout
-        const tools = await convertMcpToLangchainTools({
-          secureServer: {
-            url: `${SERVER_URL}/sse`,
-            sseOptions: {
-              authProvider,
-              requestInit: {
-                headers: {
-                  'X-Test-Header': 'test-value'
-                }
-              },
-              debug: true // Enable debug mode
-            }
-          }
-        });
-        
-        console.log('Connection successful!');
-        console.log('Available tools:', Object.keys(tools.secureServer));
-        
-        // Test the echo method
-        try {
-          console.log('Testing echo method...');
-          const echo = tools.secureServer.echo;
-          
-          if (!echo) {
-            console.error('Echo tool not found in available tools');
-            reject(new Error('Echo tool not found'));
-            return;
-          }
-          
-          const echoResult = await echo.invoke({ message: 'Hello, authenticated MCP!' });
-          console.log('Echo response:', echoResult);
-          console.log('Test completed successfully!');
-          resolve(tools);
-        } catch (error) {
-          console.error('Error calling echo method:', error);
-          reject(error);
-        }
-      } catch (error) {
-        console.error('Connection failed:', error);
-        reject(error);
-      }
-    });
-    
-    // Set a timeout for the connection
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        console.log('Connection is taking longer than expected, but still trying...');
-        
-        // Give it another 60 seconds
-        setTimeout(() => {
-          reject(new Error('Connection timed out after 120 seconds'));
-        }, 60000);
-      }, 60000);
-    });
-    
-    // Wait for either the connection to succeed or the timeout
-    await Promise.race([connectionPromise, timeoutPromise]);
+    try {
+      await connectWithAuth(authProvider);
+    } catch (error) {
+      console.error('Failed to connect with auth token:', error);
+    }
     
   } catch (error) {
     console.error('Error during authentication or retry:', error);

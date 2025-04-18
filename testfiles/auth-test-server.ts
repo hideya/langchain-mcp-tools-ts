@@ -7,6 +7,12 @@ const app = express();
 const PORT = 3333;
 const HOST = '0.0.0.0'; // Listen on all interfaces
 
+// Store active SSE sessions
+const activeSessions = new Map();
+
+// Store registered clients
+const clients = new Map();
+
 app.use(cors({
   origin: '*', // Allow all origins for testing
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -17,12 +23,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.text({ type: ['text/*', 'application/json'] }));
 app.use(express.urlencoded({ extended: true }));
-
-// Store active SSE sessions
-const sessions = new Map();
-
-// Store registered clients
-const clients = new Map();
 
 // Define our tools
 const TOOLS = [
@@ -56,14 +56,287 @@ app.get('/', (req, res) => {
   res.send('MCP Auth Test Server is running');
 });
 
+// Session handler class
+class SessionHandler {
+  req;
+  res;
+  id;
+  isActive = true;
+  lastPingTime;
+  heartbeatInterval;
+
+  constructor(req, res) {
+    this.req = req;
+    this.res = res;
+    this.id = uuidv4();
+    this.lastPingTime = Date.now();
+    
+    // Set up headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    // Set up heartbeat - much more frequent for testing
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeat();
+    }, 5000); // Every 5 seconds
+    
+    // Set up close handler
+    req.on('close', () => {
+      this.close();
+    });
+    
+    req.on('error', (error) => {
+      console.error(`Error in session ${this.id}:`, error);
+      this.close();
+    });
+  }
+  
+  // Send a message through SSE
+  send(data) {
+    if (!this.isActive) return;
+    
+    try {
+      const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
+      console.log(`Sending SSE message to ${this.id}:`, dataStr);
+      this.res.write(`data: ${dataStr}\n\n`);
+      
+      // Try to flush if available
+      if (typeof this.res.flush === 'function') {
+        this.res.flush();
+      }
+      
+      this.lastPingTime = Date.now();
+    } catch (error) {
+      console.error(`Error sending message to session ${this.id}:`, error);
+      this.close();
+    }
+  }
+  
+  // Send a heartbeat
+  sendHeartbeat() {
+    if (!this.isActive) return;
+    
+    try {
+      console.log(`Sending heartbeat to session ${this.id}`);
+      this.res.write(`: heartbeat ${new Date().toISOString()}\n\n`);
+      
+      if (typeof this.res.flush === 'function') {
+        this.res.flush();
+      }
+    } catch (error) {
+      console.error(`Error sending heartbeat to session ${this.id}:`, error);
+      this.close();
+    }
+  }
+  
+  // Close the session
+  close() {
+    if (!this.isActive) return;
+    
+    console.log(`Closing session ${this.id}`);
+    this.isActive = false;
+    clearInterval(this.heartbeatInterval);
+    
+    try {
+      this.res.end();
+    } catch (error) {
+      console.error(`Error closing session ${this.id}:`, error);
+    }
+    
+    activeSessions.delete(this.id);
+    console.log(`Session ${this.id} closed`);
+  }
+  
+  // Handle a POST message
+  async handlePostMessage(req, res) {
+    try {
+      const body = req.body;
+      console.log(`Processing message for session ${this.id}:`, typeof body === 'string' ? body : JSON.stringify(body));
+      
+      const message = typeof body === 'string' ? JSON.parse(body) : body;
+      
+      // Process the message
+      await this.processMessage(message);
+      
+      // Always send an HTTP response
+      res.status(200).json({
+        jsonrpc: '2.0',
+        id: message.id,
+        result: { success: true }
+      });
+    } catch (error) {
+      console.error(`Error handling POST message: ${error.message}`);
+      res.status(500).json({
+        jsonrpc: '2.0',
+        id: req.body.id || null,
+        error: {
+          code: -32603,
+          message: `Internal error: ${error.message}`
+        }
+      });
+    }
+  }
+  
+  // Process MCP message
+  async processMessage(message) {
+    console.log(`Processing message for session ${this.id}:`, message);
+    
+    // Check if this is a notification (no id field)
+    const isNotification = message.jsonrpc === "2.0" && message.method && message.id === undefined;
+    
+    if (message.method === "initialize") {
+      console.log(`Handling initialize request with ID: ${message.id}`);
+      
+      // Respond with proper MCP initialize response
+      const response = {
+        jsonrpc: "2.0",
+        id: message.id,
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: {
+            tools: { listChanged: true },
+            resources: { listChanged: true, subscribe: true },
+            prompts: { listChanged: true },
+            logging: { enabled: true }
+          },
+          serverInfo: {
+            name: "MCP SSE Auth Test Server",
+            version: "1.0.0"
+          },
+          tools: TOOLS
+        }
+      };
+      
+      console.log(`Sending initialize response:`, JSON.stringify(response));
+      this.send(response);
+    } 
+    else if (message.method === "tools/list") {
+      console.log(`Handling tools/list request with ID: ${message.id}`);
+      
+      // Respond with list of tools
+      const response = {
+        jsonrpc: "2.0",
+        id: message.id,
+        result: TOOLS
+      };
+      
+      console.log(`Sending tools/list response:`, JSON.stringify(response));
+      this.send(response);
+    }
+    else if (message.method === "tools/execute") {
+      console.log(`Handling tools/execute request with ID: ${message.id}`);
+      
+      // Extract tool name and parameters
+      const { name, params } = message.params;
+      
+      if (name === "echo") {
+        // Process echo tool
+        console.log(`Executing echo tool with parameters:`, params);
+        
+        const response = {
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            content: [
+              {
+                type: "text",
+                text: params.message
+              }
+            ]
+          }
+        };
+        
+        console.log(`Sending echo tool response:`, JSON.stringify(response));
+        this.send(response);
+      }
+      else if (name === "getServerInfo") {
+        // Process getServerInfo tool
+        console.log(`Executing getServerInfo tool`);
+        
+        const response = {
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  name: "MCP SSE Auth Test Server",
+                  version: "1.0.0",
+                  uptime: process.uptime(),
+                  time: new Date().toISOString()
+                })
+              }
+            ]
+          }
+        };
+        
+        console.log(`Sending getServerInfo tool response:`, JSON.stringify(response));
+        this.send(response);
+      }
+      else {
+        // Unknown tool
+        console.log(`Unknown tool: ${name}`);
+        
+        const response = {
+          jsonrpc: "2.0",
+          id: message.id,
+          error: {
+            code: -32601,
+            message: `Tool not found: ${name}`
+          }
+        };
+        
+        this.send(response);
+      }
+    }
+    else if (message.method === "resources/list" || message.method === "prompts/list") {
+      // Return empty lists for resources and prompts
+      console.log(`Handling ${message.method} request with ID:`, message.id);
+      
+      const response = {
+        jsonrpc: "2.0",
+        id: message.id,
+        result: []
+      };
+      
+      console.log(`Sending ${message.method} response:`, JSON.stringify(response));
+      this.send(response);
+    }
+    // Handle notification methods - don't need to send a response
+    else if (isNotification) {
+      console.log(`Handling notification: ${message.method}`);
+      // No response needed for notifications
+      return;
+    }
+    else {
+      console.log(`Unknown method: ${message.method}`);
+      
+      // Return error for unknown methods
+      const response = {
+        jsonrpc: "2.0",
+        id: message.id,
+        error: {
+          code: -32601,
+          message: `Method not found: ${message.method}`
+        }
+      };
+      
+      this.send(response);
+    }
+  }
+}
+
 // Basic auth middleware
-function checkAuth(req, res, next) {
+function authenticateRequest(req, res, next) {
   const authHeader = req.headers.authorization;
   console.log('Auth check - Header:', authHeader);
 
   if (!authHeader) {
     console.log('No token provided');
-    return next();
+    return res.status(401).send('Unauthorized');
   }
 
   if (authHeader.startsWith('Bearer ')) {
@@ -145,322 +418,68 @@ app.post('/token', (req, res) => {
 });
 
 // SSE endpoint with auth
-app.get('/sse', checkAuth, (req, res) => {
+app.get('/sse', authenticateRequest, (req, res) => {
   console.log('SSE connection request received');
   console.log('Headers:', req.headers);
   
-  if (!req.headers.authorization) {
-    console.log('Unauthorized SSE request - no auth header');
-    return res.status(401).send('Unauthorized');
-  }
-
-  // Set up SSE connection
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Create a new session
+  const session = new SessionHandler(req, res);
+  activeSessions.set(session.id, session);
   
-  // Create a unique session ID
-  const sessionId = uuidv4();
+  console.log(`SSE connection established with sessionId: ${session.id}`);
   
-  // Store the session
-  sessions.set(sessionId, { req, res, lastPingTime: Date.now() });
-  
-  console.log(`SSE connection established with sessionId: ${sessionId}`);
-  
-  // Send the session ID to the client
-  res.write(`data: ${JSON.stringify({ sessionId })}\n\n`);
-  
-  // Also send the endpoint URL
+  // Send the endpoint URL for the client to use
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const endpointUrl = `${baseUrl}/sse/${sessionId}`;
+  const endpointUrl = `${baseUrl}/sse/${session.id}`;
   console.log(`Sending endpoint URL: ${endpointUrl}`);
-  res.write(`event: endpoint\ndata: ${endpointUrl}\n\n`);
   
-  // Handle client disconnection
-  req.on('close', () => {
-    console.log(`Client disconnected, removing session ${sessionId}`);
-    sessions.delete(sessionId);
+  // Send session ID first
+  session.send({
+    sessionId: session.id
   });
+  
+  // Then send endpoint event
+  res.write(`event: endpoint\ndata: ${endpointUrl}\n\n`);
 });
 
 // Handle SSE messages
-app.post('/sse/:sessionId', checkAuth, (req, res) => {
+app.post('/sse/:sessionId', authenticateRequest, async (req, res) => {
   const { sessionId } = req.params;
-  const message = req.body;
-  
-  console.log(`Received message for session ${sessionId}:`, message);
+  console.log(`Received message for session ${sessionId}`);
   console.log('Headers:', req.headers);
-  console.log('Content-Type:', req.headers['content-type']);
   
-  if (sessions.has(sessionId)) {
-    try {
-      handleSSEMessage(sessionId, typeof message === 'string' ? message : JSON.stringify(message));
-      res.sendStatus(200);
-    } catch (error) {
-      console.error(`Error handling message: ${error.message}`);
-      res.status(500).send(`Error handling message: ${error.message}`);
-    }
-  } else {
+  const session = activeSessions.get(sessionId);
+  
+  if (!session) {
     console.log(`Session ${sessionId} not found`);
-    res.status(404).send('Session not found');
+    return res.status(404).json({
+      jsonrpc: '2.0',
+      id: req.body.id || null,
+      error: { code: -32001, message: 'Session not found' }
+    });
   }
+  
+  // Let the session handler process the message
+  await session.handlePostMessage(req, res);
 });
 
-// Function to handle SSE messages
-function handleSSEMessage(sessionId, message) {
-  console.log(`Processing message for session ${sessionId}:`, message);
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
   
-  try {
-    const parsed = JSON.parse(message);
-    console.log(`Parsed message:`, parsed);
-    
-    // Check if this is a notification (no id field)
-    const isNotification = parsed.jsonrpc === "2.0" && parsed.method && parsed.id === undefined;
-    
-    if (parsed.method === "initialize") {
-      console.log("Handling initialize request with ID:", parsed.id);
-      
-      // Respond with proper MCP initialize response
-      const response = {
-        jsonrpc: "2.0",
-        id: parsed.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          capabilities: {
-            tools: { listChanged: true },
-            resources: { listChanged: true, subscribe: true },
-            prompts: { listChanged: true },
-            logging: { enabled: true }
-          },
-          serverInfo: {
-            name: "MCP SSE Auth Test Server",
-            version: "1.0.0"
-          },
-          tools: TOOLS
-        }
-      };
-      
-      console.log("Sending initialize response:", JSON.stringify(response));
-      sendSSEMessage(sessionId, JSON.stringify(response));
-    } 
-    else if (parsed.method === "tools/list") {
-      console.log("Handling tools/list request with ID:", parsed.id);
-      
-      // Respond with list of tools
-      const response = {
-        jsonrpc: "2.0",
-        id: parsed.id,
-        result: TOOLS
-      };
-      
-      console.log("Sending tools/list response:", JSON.stringify(response));
-      sendSSEMessage(sessionId, JSON.stringify(response));
-    }
-    else if (parsed.method === "tools/call") {
-      console.log("Handling tools/call request with ID:", parsed.id);
-      
-      // Extract tool name and parameters
-      const { name, parameters } = parsed.params;
-      
-      if (name === "echo") {
-        // Process echo tool
-        console.log("Executing echo tool with parameters:", parameters);
-        
-        const response = {
-          jsonrpc: "2.0",
-          id: parsed.id,
-          result: {
-            content: [
-              {
-                type: "text",
-                text: parameters.message
-              }
-            ]
-          }
-        };
-        
-        console.log("Sending echo tool response:", JSON.stringify(response));
-        sendSSEMessage(sessionId, JSON.stringify(response));
-      }
-      else if (name === "getServerInfo") {
-        // Process getServerInfo tool
-        console.log("Executing getServerInfo tool");
-        
-        const response = {
-          jsonrpc: "2.0",
-          id: parsed.id,
-          result: {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  name: "MCP SSE Auth Test Server",
-                  version: "1.0.0",
-                  uptime: process.uptime(),
-                  time: new Date().toISOString()
-                })
-              }
-            ]
-          }
-        };
-        
-        console.log("Sending getServerInfo tool response:", JSON.stringify(response));
-        sendSSEMessage(sessionId, JSON.stringify(response));
-      }
-      else {
-        // Unknown tool
-        console.log(`Unknown tool: ${name}`);
-        
-        const response = {
-          jsonrpc: "2.0",
-          id: parsed.id,
-          error: {
-            code: -32601,
-            message: `Tool not found: ${name}`
-          }
-        };
-        
-        sendSSEMessage(sessionId, JSON.stringify(response));
+  res.status(500).json({
+    jsonrpc: '2.0',
+    id: req.body?.id || null,
+    error: {
+      code: -32603,
+      message: 'Internal server error',
+      data: {
+        errorMessage: err.message,
+        stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined
       }
     }
-    else if (parsed.method === "resources/list" || parsed.method === "prompts/list") {
-      // Return empty lists for resources and prompts
-      console.log(`Handling ${parsed.method} request with ID:`, parsed.id);
-      
-      const response = {
-        jsonrpc: "2.0",
-        id: parsed.id,
-        result: []
-      };
-      
-      console.log(`Sending ${parsed.method} response:`, JSON.stringify(response));
-      sendSSEMessage(sessionId, JSON.stringify(response));
-    }
-    else if (parsed.method === "echo") {
-      console.log("Handling echo request with ID:", parsed.id);
-      
-      // Simple echo method implementation
-      const response = {
-        jsonrpc: "2.0",
-        id: parsed.id,
-        result: parsed.params.message // Just return the message parameter
-      };
-      
-      sendSSEMessage(sessionId, JSON.stringify(response));
-    }
-    else if (parsed.method === "getServerInfo") {
-      console.log("Handling getServerInfo request with ID:", parsed.id);
-      
-      // Simple server info implementation
-      const response = {
-        jsonrpc: "2.0",
-        id: parsed.id,
-        result: {
-          name: "MCP SSE Auth Test Server",
-          version: "1.0.0",
-          uptime: process.uptime()
-        }
-      };
-      
-      sendSSEMessage(sessionId, JSON.stringify(response));
-    }
-    // Handle notification methods - don't need to send a response
-    else if (isNotification) {
-      console.log(`Handling notification: ${parsed.method}`);
-      // No response needed for notifications
-      return;
-    }
-    else {
-      console.log(`Unknown method: ${parsed.method}`);
-      
-      // Return error for unknown methods
-      const response = {
-        jsonrpc: "2.0",
-        id: parsed.id,
-        error: {
-          code: -32601,
-          message: `Method not found: ${parsed.method}`
-        }
-      };
-      
-      sendSSEMessage(sessionId, JSON.stringify(response));
-    }
-  } catch (error) {
-    console.error(`Error handling message: ${error.message}`);
-    
-    try {
-      const parsed = JSON.parse(message);
-      // Send error response
-      const errorResponse = {
-        jsonrpc: "2.0",
-        id: parsed.id || null,
-        error: {
-          code: -32000,
-          message: `Internal error: ${error.message}`
-        }
-      };
-      
-      sendSSEMessage(sessionId, JSON.stringify(errorResponse));
-    } catch (parseError) {
-      console.error("Could not parse message to send error response");
-    }
-    
-    throw error; // Re-throw for the route handler to catch
-  }
-}
-
-// Function to send SSE messages
-function sendSSEMessage(sessionId, data) {
-  const session = sessions.get(sessionId);
-  if (session) {
-    try {
-      // Format the data as an SSE event with proper formatting
-      console.log(`Sending SSE message to ${sessionId}: ${data}`);
-      session.res.write(`data: ${data}\n\n`);
-      
-      // Try to flush the data if the method exists
-      if (typeof session.res.flush === 'function') {
-        session.res.flush();
-      }
-      
-      // Update ping time
-      session.lastPingTime = Date.now();
-    } catch (error) {
-      console.error(`Error sending SSE message: ${error.message}`);
-      // Remove the session if we can't send to it
-      sessions.delete(sessionId);
-      throw error;
-    }
-  } else {
-    console.error(`Session ${sessionId} not found when trying to send message`);
-    throw new Error(`Session ${sessionId} not found`);
-  }
-}
-
-// Ping function to keep connections alive
-function pingAllSessions() {
-  console.log(`Pinging ${sessions.size} active sessions`);
-  
-  for (const [sessionId, session] of sessions.entries()) {
-    try {
-      // Send a ping every 30 seconds
-      if (Date.now() - session.lastPingTime > 30000) {
-        session.res.write(`: ping ${new Date().toISOString()}\n\n`);
-        if (typeof session.res.flush === 'function') {
-          session.res.flush();
-        }
-        session.lastPingTime = Date.now();
-      }
-    } catch (error) {
-      console.error(`Error pinging session ${sessionId}: ${error.message}`);
-      sessions.delete(sessionId);
-    }
-  }
-}
-
-// Set up ping interval for keepalive
-setInterval(pingAllSessions, 15000);
+  });
+});
 
 // Start the server
 app.listen(PORT, HOST, () => {
