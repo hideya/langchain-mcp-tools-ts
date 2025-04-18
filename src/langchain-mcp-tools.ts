@@ -2,11 +2,12 @@ import { IOType } from "node:child_process";
 import { Stream } from "node:stream";
 import { DynamicStructuredTool, StructuredTool } from "@langchain/core/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { SSEClientTransport, SSEClientTransportOptions } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod, JsonSchema } from "@n8n/json-schema-to-zod";
 import { z } from "zod";
 import { Logger } from "./logger.js";
@@ -28,6 +29,15 @@ interface UrlBasedConfig {
   env?: never;
   stderr?: never;
   cwd?: never;
+  // SSE client transport options
+  sseOptions?: {
+    // An OAuth client provider to use for authentication
+    authProvider?: OAuthClientProvider;
+    // Customizes the initial SSE request to the server
+    eventSourceInit?: EventSourceInit;
+    // Customizes recurring POST requests to the server
+    requestInit?: RequestInit;
+  };
 }
 
 type McpServerConfig = CommandBasedConfig | UrlBasedConfig;
@@ -184,7 +194,26 @@ async function convertSingleMcpToLangchainTools(
     }
   
     if (url?.protocol === "http:" || url?.protocol === "https:") {
-      transport = new SSEClientTransport(url);
+      // Extract SSE options from config if available
+      const urlConfig = config as UrlBasedConfig;
+      const sseOptions: SSEClientTransportOptions = {};
+      
+      if (urlConfig.sseOptions) {
+        if (urlConfig.sseOptions.authProvider) {
+          sseOptions.authProvider = urlConfig.sseOptions.authProvider;
+          logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
+        }
+        
+        if (urlConfig.sseOptions.eventSourceInit) {
+          sseOptions.eventSourceInit = urlConfig.sseOptions.eventSourceInit;
+        }
+        
+        if (urlConfig.sseOptions.requestInit) {
+          sseOptions.requestInit = urlConfig.sseOptions.requestInit;
+        }
+      }
+      
+      transport = new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
 
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
       transport = new WebSocketClientTransport(url);

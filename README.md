@@ -5,11 +5,14 @@ This package is intended to simplify the use of
 server tools with LangChain / TypeScript.
 
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
-an open source technology
+an open standard
 [announced by Anthropic](https://www.anthropic.com/news/model-context-protocol),
-dramatically expands LLM’s scope
+dramatically expands LLM's scope
 by enabling external tool and resource integration, including
-Google Drive, Slack, Notion, Spotify, Docker, PostgreSQL, and more…
+GitHub, Google Drive, Slack, Notion, Spotify, Docker, PostgreSQL, and more…
+
+MCP is likely to become the de facto industry standard as 
+[OpenAI has announced its adoption](https://techcrunch.com/2025/03/26/openai-adopts-rival-anthropics-standard-for-connecting-ai-models-to-data).
 
 Over 2000 functional components available as MCP servers:
 
@@ -24,7 +27,7 @@ This async function handles parallel initialization of specified multiple MCP se
 and converts their available tools into an array of LangChain-compatible tools.
 
 For detailed information on how to use this library, please refer to the following document:
-- ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
+- ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
 
 A python equivalent of this utility is available
 [here](https://pypi.org/project/langchain-mcp-tools)
@@ -90,7 +93,7 @@ For hands-on experimentation with MCP server integration,
 try [this LangChain application built with the utility](https://github.com/hideya/mcp-client-langchain-ts)
 
 For detailed information on how to use this library, please refer to the following document:  
-["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
+["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
 
 ## Experimental Features
 
@@ -114,6 +117,47 @@ it introduces remote server support.
 
 A usage example can be found [here](
 https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd5274d95d3f6d14bed0937a6/src/index.ts#L26-L38)
+
+### Authentication Support for SSE Connections
+
+The library now supports authentication for SSE connections to MCP servers. This is particularly useful for accessing authenticated MCP servers that require OAuth.
+
+To enable authentication, provide SSE options in your server configuration:
+
+```ts
+import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+
+// Implement your own OAuth client provider
+class MyOAuthProvider implements OAuthClientProvider {
+  // Implementation details...
+}
+
+const mcpServers = {
+  "secure-server": {
+    url: "https://secure-mcp-server.example.com",
+    sseOptions: {
+      // Provide an OAuth client provider
+      authProvider: new MyOAuthProvider(),
+      
+      // Optionally customize the initial SSE request
+      eventSourceInit: {
+        // Custom options
+      },
+      
+      // Optionally customize recurring POST requests
+      requestInit: {
+        headers: {
+          'X-Custom-Header': 'custom-value'
+        }
+      }
+    }
+  }
+};
+```
+
+A complete example showing how to implement an OAuth client provider can be found in the [auth-example.ts](./testfiles/auth-example.ts) file. You can run this example with `npm run auth-example`. 
+
+For testing purposes, a sample MCP server with OAuth authentication support is provided in [auth-test-server.ts](./testfiles/auth-test-server.ts). You can run this server with `npm run auth-test-server`.
 
 ### Working Directory Configuration for Local MCP Servers
 

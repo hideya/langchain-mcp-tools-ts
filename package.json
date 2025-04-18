@@ -34,6 +34,8 @@
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "simple-usage": "tsx testfiles/simple-usage.ts",
+    "auth-example": "tsx testfiles/auth-example.ts",
+    "auth-test-server": "tsx testfiles/auth-test-server.ts",
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -58,11 +60,14 @@
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",
     "@vitest/coverage-v8": "^3.0.9",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "eslint": "^9.17.0",
+    "express": "^4.19.2",
     "tsx": "^4.19.3",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
+    "uuid": "^9.0.1",
     "vitest": "^3.0.9"
   }
 }
