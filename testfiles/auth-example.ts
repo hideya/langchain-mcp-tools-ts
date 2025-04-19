@@ -1,6 +1,5 @@
-import { convertMcpToLangchainTools } from '../src/langchain-mcp-tools';
+import { convertMcpToLangchainTools, McpServersConfig } from '../src/langchain-mcp-tools';
 import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import pkceChallenge from 'pkce-challenge';
 
 // Enable more verbose logging for debugging
 process.env.MCP_DEBUG = 'true';
@@ -43,9 +42,8 @@ class TestOAuthProvider implements OAuthClientProvider {
     return this._codeVerifier;
   }
 
-  async saveCodeVerifier(verifier: string) {
-    this._codeVerifier = verifier;
-    return verifier;
+  async saveCodeVerifier(codeVerifier: string): Promise<void> {
+    this._codeVerifier = codeVerifier;
   }
 
   async redirectToAuthorization(url: URL) {
@@ -138,9 +136,9 @@ class TestOAuthProvider implements OAuthClientProvider {
 const logAllMessages = (enabled = true) => {
   if (enabled) {
     const originalFetch = global.fetch;
-    global.fetch = async function(...args) {
+    global.fetch = async function(...args: Parameters<typeof fetch>) {
       console.log('MCP fetch request:', args[0], args[1]?.method);
-      if (args[1]?.body) {
+      if (args[1]?.body && typeof args[1].body === 'string') {
         try {
           const body = JSON.parse(args[1].body);
           console.log('Request body:', body);
@@ -171,35 +169,18 @@ const connectWithAuth = async (authProvider) => {
   
   try {
     const tools = await convertMcpToLangchainTools({
-      servers: {
-        secureServer: {
-          url: 'http://127.0.0.1:3333/sse',
-          sseOptions: {
-            authProvider: authProvider,
-            requestInit: {
-              headers: {
-                'X-Test-Header': 'test-value',
-              },
-            },
-            debug: true,
-          },
+      secureServer: {
+        url: 'http://127.0.0.1:3333/sse',
+        sseOptions: {
+          authProvider: authProvider
         },
-      },
-      // Add a shorter timeout to fail faster during testing
-      initializationTimeout: 20000, // 20 seconds instead of default 60
+      }
     });
     
+    console.log('Connection successful!', tools); 
+
     console.log('Connection successful! Available tools:', 
-      Object.keys(tools.secureServer).join(', '));
-      
-    // Test a tool to verify everything is working
-    if (tools.secureServer && tools.secureServer.echo) {
-      console.log('Testing echo tool...');
-      const result = await tools.secureServer.echo.invoke({ message: 'Hello from authenticated client!' });
-      console.log('Echo result:', result);
-    } else {
-      console.log('No echo tool available');
-    }
+      Object.keys(tools).join(', '));
     
     return tools;
   } catch (error) {
@@ -249,25 +230,25 @@ async function main() {
     redirectUrl: 'http://localhost:3000/callback'
   });
 
+  const mcpSseServerWithAuth: McpServersConfig = {
+    secureServer: {
+      url: `${SERVER_URL}/sse`,
+      sseOptions: {
+        authProvider,
+        requestInit: {
+          headers: {
+            'X-Test-Header': 'test-value'
+          }
+        }
+      },
+    },
+  };
+
   try {
     // First connection attempt will fail because we need to authenticate
     console.log('Attempting initial connection (expected to fail)...');
     try {
-      await convertMcpToLangchainTools({
-        servers: {
-          secureServer: {
-            url: `${SERVER_URL}/sse`,
-            sseOptions: {
-              authProvider,
-              requestInit: {
-                headers: {
-                  'X-Test-Header': 'test-value'
-                }
-              }
-            },
-          },
-        }
-      });
+      await convertMcpToLangchainTools(mcpSseServerWithAuth);
     } catch (error) {
       console.log('Initial connection failed as expected (auth required):', error.message);
     }
