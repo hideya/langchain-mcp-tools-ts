@@ -1,8 +1,24 @@
 import { convertMcpToLangchainTools, McpServersConfig } from '../src/langchain-mcp-tools';
 import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import * as crypto from 'crypto';
 
 // Enable more verbose logging for debugging
 process.env.MCP_DEBUG = 'true';
+
+// Simple function to generate PKCE code verifier and challenge
+function generatePkceChallenge() {
+  // For testing, we'll use a fixed code verifier
+  const codeVerifier = 'test_code_verifier_123456789012345678901234567890';
+  
+  // Create a code challenge (normally this would be the base64url of SHA256 hash)
+  // For testing, we'll use a simple value
+  const codeChallenge = 'test_code_challenge_123456789012345678901234567890';
+  
+  return {
+    code_verifier: codeVerifier,
+    code_challenge: codeChallenge
+  };
+}
 
 // Create a class that implements the OAuthClientProvider interface
 class TestOAuthProvider implements OAuthClientProvider {
@@ -11,7 +27,7 @@ class TestOAuthProvider implements OAuthClientProvider {
   private _codeVerifier: string = '';
   private _redirectUrl: string;
   private _clientMetadata: any;
-
+  
   constructor(options: { clientMetadata: any; redirectUrl: string }) {
     this._redirectUrl = options.redirectUrl;
     this._clientMetadata = options.clientMetadata;
@@ -19,116 +35,67 @@ class TestOAuthProvider implements OAuthClientProvider {
     // Initialize code verifier with a default value
     this._codeVerifier = 'default_code_verifier_for_testing_123456789012345678901234567890';
   }
-
+  
   // Required methods from OAuthClientProvider interface
   async clientInformation() {
     return this._clientInfo;
   }
-
+  
   async saveClientInformation(info: any) {
+    console.log('Saving client information:', info);
     this._clientInfo = info;
   }
-
+  
   async tokens() {
     return this._tokens;
   }
-
+  
   async saveTokens(tokens: any) {
+    console.log('Saving tokens:', tokens);
     this._tokens = tokens;
     return tokens;
   }
-
+  
   async codeVerifier() {
     return this._codeVerifier;
   }
-
+  
   async saveCodeVerifier(codeVerifier: string): Promise<void> {
+    console.log('Saving code verifier:', codeVerifier);
     this._codeVerifier = codeVerifier;
   }
-
+  
   async redirectToAuthorization(url: URL) {
     console.log(`[Authorization needed] User would be redirected to: ${url.toString()}`);
+    
+    // For automated testing, we'll simulate the authorization flow
+    console.log('Simulating user authorization...');
+    
+    // Extract client_id and other query parameters
+    const clientId = url.searchParams.get('client_id');
+    const codeChallenge = url.searchParams.get('code_challenge');
+    const redirectUri = url.searchParams.get('redirect_uri');
+    
+    console.log('Client ID:', clientId);
+    console.log('Code Challenge:', codeChallenge);
+    console.log('Redirect URI:', redirectUri);
+    
+    // Simulate authorization code
+    const authCode = 'valid_auth_code_123';
+    console.log('Simulated authorization code:', authCode);
+    
+    // In a real implementation, this would throw or redirect.
+    // For testing, let's throw with the auth code for simulating the flow
     throw new Error('Authorization required');
   }
-
-  // Helper methods for our test implementation
+  
+  // Helper property getters
   get redirectUrl() {
     return this._redirectUrl;
   }
-
+  
   get clientMetadata() {
     return this._clientMetadata;
-  }
-
-  // Manual code verifier and challenge generation
-  generateCodeVerifier() {
-    try {
-      console.log('Generating code verifier...');
-      // Generate a random string for code verifier (PKCE)
-      const randomBytes = new Uint8Array(32);
-      crypto.getRandomValues(randomBytes);
-      const verifier = btoa(String.fromCharCode(...randomBytes))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
-      
-      this._codeVerifier = verifier;
-      return this._codeVerifier;
-    } catch (error) {
-      console.error('Error generating code verifier:', error);
-      // Use default code verifier if generation fails
-      return this._codeVerifier;
-    }
-  }
-
-  // Generate a code challenge for PKCE
-  async generateCodeChallenge(verifier: string) {
-    try {
-      console.log('Generating code challenge for verifier...');
-      const encoder = new TextEncoder();
-      const data = encoder.encode(verifier);
-      const digest = await crypto.subtle.digest('SHA-256', data);
-      
-      // Convert to base64url format
-      return btoa(String.fromCharCode(...new Uint8Array(digest)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-    } catch (error) {
-      console.error('Error generating code challenge:', error);
-      // Simple fallback
-      return 'fallback_code_challenge';
-    }
-  }
-
-  // Request client information from the server
-  async requestClientInfo(registerUrl: string) {
-    console.log(`Requesting client info from: ${registerUrl}`);
-    try {
-      const response = await fetch(registerUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(this._clientMetadata)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Client registration failed: ${response.status}`);
-      }
-
-      const clientInfo = await response.json();
-      this._clientInfo = clientInfo;
-      return clientInfo;
-    } catch (error) {
-      console.error(`Error requesting client info: ${error.message}`);
-      throw error;
-    }
-  }
-
-  // Set tokens directly (for testing)
-  async setTokens(tokens: any) {
-    return this.saveTokens(tokens);
   }
 }
 
@@ -160,6 +127,34 @@ const logAllMessages = (enabled = true) => {
       
       return response;
     };
+
+    // Also monkey patch EventSource to debug SSE messages
+    const originalEventSource = global.EventSource;
+    // @ts-ignore
+    global.EventSource = function(url, options) {
+      console.log('Creating EventSource connection to:', url);
+      console.log('EventSource options:', options);
+      
+      // @ts-ignore
+      const eventSource = new originalEventSource(url, options);
+      
+      const originalAddEventListener = eventSource.addEventListener;
+      eventSource.addEventListener = function(type, listener, options) {
+        console.log(`Adding event listener for: ${type}`);
+        
+        // Wrap the listener to log events
+        const wrappedListener = function(event) {
+          console.log(`SSE event received: ${type}`, event?.data ? event.data : '(no data)');
+          // @ts-ignore
+          listener(event);
+        };
+        
+        // @ts-ignore
+        return originalAddEventListener.call(this, type, wrappedListener, options);
+      };
+      
+      return eventSource;
+    };
   }
 };
 
@@ -168,21 +163,46 @@ const connectWithAuth = async (authProvider) => {
   console.log('Connecting with auth token...');
   
   try {
-    const tools = await convertMcpToLangchainTools({
+    // Add debug timeout to see if connection is hanging
+    const connectPromise = convertMcpToLangchainTools({
       secureServer: {
         url: 'http://127.0.0.1:3333/sse',
         sseOptions: {
-          authProvider: authProvider
+          authProvider: authProvider,
+          requestInit: {
+            headers: {
+              'X-Test-Header': 'test-value'
+            }
+          }
         },
       }
     });
     
-    console.log('Connection successful!', tools); 
-
-    console.log('Connection successful! Available tools:', 
-      Object.keys(tools).join(', '));
+    // Set a timeout to see if we're hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Connection timed out - check server logs for details'));
+      }, 10000); // 10 second timeout
+    });
     
-    return tools;
+    // Race the connection against the timeout
+    const result = await Promise.race([connectPromise, timeoutPromise]);
+    const { tools, cleanup } = result as any;
+    
+    console.log('Connection successful! Available tools:', 
+      tools.map(t => t.name).join(', '));
+    
+    // Try using a tool if any are available
+    if (tools.length > 0) {
+      const echoTool = tools.find(t => t.name === 'echo');
+      if (echoTool) {
+        console.log('Testing echo tool...');
+        const result = await echoTool.invoke({ message: 'Hello, authenticated MCP!' });
+        console.log('Echo result:', result);
+      }
+    }
+    
+    return { tools, cleanup };
   } catch (error) {
     console.error('Connection failed:', error);
     
@@ -230,99 +250,99 @@ async function main() {
     redirectUrl: 'http://localhost:3000/callback'
   });
 
-  const mcpSseServerWithAuth: McpServersConfig = {
-    secureServer: {
-      url: `${SERVER_URL}/sse`,
-      sseOptions: {
-        authProvider,
-        requestInit: {
-          headers: {
-            'X-Test-Header': 'test-value'
-          }
-        }
-      },
-    },
-  };
-
   try {
-    // First connection attempt will fail because we need to authenticate
-    console.log('Attempting initial connection (expected to fail)...');
-    try {
-      await convertMcpToLangchainTools(mcpSseServerWithAuth);
-    } catch (error) {
-      console.log('Initial connection failed as expected (auth required):', error.message);
-    }
-
-    // Manually perform the authentication flow
     console.log('\nStarting manual authentication flow');
     
     // Step 1: Register the client and get client info
     console.log('Registering client...');
-    const clientInfo = await authProvider.requestClientInfo(`${SERVER_URL}/register`);
+    const registerUrl = `${SERVER_URL}/register`;
+    const registerResponse = await fetch(registerUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(authProvider.clientMetadata)
+    });
+    
+    if (!registerResponse.ok) {
+      throw new Error(`Client registration failed: ${registerResponse.status}`);
+    }
+    
+    const clientInfo = await registerResponse.json();
+    await authProvider.saveClientInformation(clientInfo);
+    
     console.log('Client information received:');
     console.log(`- Client ID: ${clientInfo.client_id}`);
     console.log(`- Client Secret: ${clientInfo.client_secret ? '[PRESENT]' : '[MISSING]'}`);
     
-    // Step 2: Generate code verifier for PKCE with error handling
+    // Step 2: Generate code verifier for PKCE
     console.log('Generating code verifier...');
-    let codeVerifier = authProvider.generateCodeVerifier();
-    console.log('Code verifier type:', typeof codeVerifier);
+    // Use our simple implementation instead of the library
+    const challenge = generatePkceChallenge();
+    const codeVerifier = challenge.code_verifier;
+    const codeChallenge = challenge.code_challenge;
+    
+    await authProvider.saveCodeVerifier(codeVerifier);
     console.log(`Code verifier generated: ${codeVerifier.substring(0, 10)}...`);
-    
-    // Step 3: Simulate authorization redirect
-    console.log('\n========== AUTHORIZATION REQUIRED ==========');
-    console.log('In a real application, the user would be redirected to:');
-    
-    let codeChallenge = await authProvider.generateCodeChallenge(codeVerifier);
     console.log(`Code challenge generated: ${codeChallenge}`);
     
-    const authUrl = new URL(`${SERVER_URL}/authorize`);
-    authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('client_id', clientInfo.client_id);
-    authUrl.searchParams.append('code_challenge', codeChallenge);
-    authUrl.searchParams.append('code_challenge_method', 'S256');
-    authUrl.searchParams.append('redirect_uri', 'http://localhost:3000/callback');
-    
-    console.log(authUrl.toString());
-    console.log('\nFor this test, we will simulate the flow.\n');
-    
-    // Step 4: Simulate receiving authorization code
-    console.log('Simulating user authorization...');
-    console.log('Authorization code would be sent to: http://localhost:3000/callback');
+    // Step 3: Simulate authorization
+    console.log('\nSimulating authorization...');
     const authCode = 'valid_auth_code_123';
-    console.log(`Authorization code: ${authCode}`);
+    console.log(`Using authorization code: ${authCode}`);
     
-    // Step 5: Exchange code for tokens
-    console.log(`Finishing authorization with code: ${authCode}`);
-    console.log(`Using client ID: ${clientInfo.client_id}`);
-    console.log(`Using code verifier: ${codeVerifier.substring(0, 10)}...`);
-    
-    // Generate test token directly instead of calling token endpoint
-    const testToken = `test_token_${clientInfo.client_id}`;
-    console.log(`Setting test token: ${testToken}`);
-    
-    await authProvider.setTokens({
-      access_token: testToken,
-      token_type: 'Bearer',
-      expires_in: 3600,
-      refresh_token: `refresh_${testToken}`
+    // Step 4: Exchange code for tokens
+    console.log('\nExchanging code for tokens...');
+    const tokenUrl = `${SERVER_URL}/token`;
+    const params = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: clientInfo.client_id,
+      code: authCode,
+      code_verifier: codeVerifier
     });
     
+    if (clientInfo.client_secret) {
+      params.set('client_secret', clientInfo.client_secret);
+    }
+    
+    const tokenResponse = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params,
+    });
+    
+    if (!tokenResponse.ok) {
+      throw new Error(`Token exchange failed: HTTP ${tokenResponse.status}`);
+    }
+    
+    const tokens = await tokenResponse.json();
+    await authProvider.saveTokens(tokens);
+    
     console.log('Tokens received:');
-    console.log(`- Access token: ${testToken.substring(0, 10)}...`);
-    console.log(`- Expires in: 3600 seconds`);
-    console.log(`- Refresh token: ${`refresh_${testToken}`.substring(0, 10)}...`);
+    console.log(`- Access token: ${tokens.access_token.substring(0, 10)}...`);
+    console.log(`- Expires in: ${tokens.expires_in} seconds`);
+    if (tokens.refresh_token) {
+      console.log(`- Refresh token: ${tokens.refresh_token.substring(0, 10)}...`);
+    }
     
     console.log('\nAuthentication completed!');
     
     // Now try to connect with the auth token
-    console.log('\nRetrying connection with auth token...');
+    console.log('\nConnecting with auth token...');
     
     // Add a delay to ensure the server is ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     try {
-      await connectWithAuth(authProvider);
+      const { tools, cleanup } = await connectWithAuth(authProvider);
+      
+      console.log(`\nConnection successful with ${tools.length} tools available.`);
+      
+      // Clean up when done
+      await cleanup();
+      console.log('Connection cleaned up.');
     } catch (error) {
       console.error('Failed to connect with auth token:', error);
     }

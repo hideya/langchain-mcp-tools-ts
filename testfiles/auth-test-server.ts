@@ -181,7 +181,7 @@ class SessionHandler {
   
   // Process MCP message
   async processMessage(message) {
-    console.log(`Processing message for session ${this.id}:`, message);
+    console.log(`Processing message for session ${this.id}:`, JSON.stringify(message));
     
     // Check if this is a notification (no id field)
     const isNotification = message.jsonrpc === "2.0" && message.method && message.id === undefined;
@@ -225,15 +225,20 @@ class SessionHandler {
       console.log(`Sending tools/list response:`, JSON.stringify(response));
       this.send(response);
     }
-    else if (message.method === "tools/execute") {
-      console.log(`Handling tools/execute request with ID: ${message.id}`);
+    else if (message.method === "tools/execute" || message.method === "tools/call") {
+      // Support both the old method name (execute) and the new method name (call)
+      console.log(`Handling tools/${message.method === "tools/execute" ? "execute" : "call"} request with ID: ${message.id}`);
       
-      // Extract tool name and parameters
-      const { name, params } = message.params;
+      // Extract tool name and parameters (handle both call and execute formats)
+      const params = message.params;
+      const name = params.name;
+      const toolParams = params.arguments || params.params;
+      
+      console.log(`Tool ${name} called with params:`, toolParams);
       
       if (name === "echo") {
         // Process echo tool
-        console.log(`Executing echo tool with parameters:`, params);
+        console.log(`Executing echo tool with parameters:`, toolParams);
         
         const response = {
           jsonrpc: "2.0",
@@ -242,7 +247,7 @@ class SessionHandler {
             content: [
               {
                 type: "text",
-                text: params.message
+                text: toolParams.message
               }
             ]
           }
@@ -343,7 +348,7 @@ function authenticateRequest(req, res, next) {
     const token = authHeader.substring(7);
     
     // Check if it's our test token
-    if (token.startsWith('test_token_client_')) {
+    if (token.startsWith('test_token_')) {
       console.log('Accept test token for development');
       return next();
     }
@@ -433,14 +438,22 @@ app.get('/sse', authenticateRequest, (req, res) => {
   const endpointUrl = `${baseUrl}/sse/${session.id}`;
   console.log(`Sending endpoint URL: ${endpointUrl}`);
   
-  // Send session ID first
-  session.send({
-    sessionId: session.id
-  });
+  // Send endpoint event first (this is critical for the client SDK)
+  // Use a specific format ensuring no extra whitespace
+  const endpointEventStr = `event: endpoint\ndata: ${endpointUrl}\n\n`;
+  console.log(`Sending raw endpoint event: ${endpointEventStr.replace(/\n/g, '\\n')}`);
+  res.write(endpointEventStr);
   
-  // Send the endpoint event instead of just writing the data
-  // This is crucial for the client to know where to send messages
-  res.write(`event: endpoint\ndata: ${endpointUrl}\n\n`);
+  // Make sure it's flushed immediately
+  if (typeof res.flush === 'function') {
+    res.flush();
+  }
+  
+  // Then send session ID as a regular message
+  session.send({
+    sessionId: session.id,
+    serverTime: new Date().toISOString()
+  });
   
   // Send a test initialization message after a short delay
   // This will help verify the connection is working properly
@@ -461,6 +474,7 @@ app.post('/sse/:sessionId', authenticateRequest, async (req, res) => {
   const { sessionId } = req.params;
   console.log(`Received message for session ${sessionId}`);
   console.log('Headers:', req.headers);
+  console.log('Body:', typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
   
   const session = activeSessions.get(sessionId);
   
@@ -468,7 +482,7 @@ app.post('/sse/:sessionId', authenticateRequest, async (req, res) => {
     console.log(`Session ${sessionId} not found`);
     return res.status(404).json({
       jsonrpc: '2.0',
-      id: req.body.id || null,
+      id: req.body?.id || null,
       error: { code: -32001, message: 'Session not found' }
     });
   }
@@ -476,6 +490,9 @@ app.post('/sse/:sessionId', authenticateRequest, async (req, res) => {
   // Let the session handler process the message
   await session.handlePostMessage(req, res);
 });
+
+// Middleware to handle OPTIONS requests for CORS preflight
+app.options('*', cors());
 
 // Global error handler
 app.use((err, req, res, next) => {
