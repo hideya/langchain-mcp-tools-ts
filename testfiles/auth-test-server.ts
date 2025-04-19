@@ -438,8 +438,22 @@ app.get('/sse', authenticateRequest, (req, res) => {
     sessionId: session.id
   });
   
-  // Then send endpoint event
+  // Send the endpoint event instead of just writing the data
+  // This is crucial for the client to know where to send messages
   res.write(`event: endpoint\ndata: ${endpointUrl}\n\n`);
+  
+  // Send a test initialization message after a short delay
+  // This will help verify the connection is working properly
+  setTimeout(() => {
+    if (session.isActive) {
+      console.log(`Sending test welcome message to ${session.id}`);
+      session.send({
+        type: "welcome",
+        message: "Welcome to the MCP SSE Auth Test Server!",
+        time: new Date().toISOString()
+      });
+    }
+  }, 1000);
 });
 
 // Handle SSE messages
@@ -482,11 +496,27 @@ app.use((err, req, res, next) => {
 });
 
 // Start the server
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`Auth test MCP server running at http://${HOST}:${PORT}`);
   console.log(`SSE endpoint: http://${HOST}:${PORT}/sse`);
   console.log(`\nFor local testing, use: http://127.0.0.1:${PORT}`);
   console.log('\nFor testing, use these commands:');
   console.log('1. To run server: npm run auth-test-server');
   console.log('2. To run auth example: npm run auth-example');
+});
+
+// Properly handle server shutdown
+process.on('SIGINT', () => {
+  console.log('\nShutting down server...');
+  
+  // Close all active sessions
+  for (const [sessionId, session] of activeSessions.entries()) {
+    console.log(`Closing session ${sessionId}`);
+    session.close();
+  }
+  
+  server.close(() => {
+    console.log('Server shutdown complete');
+    process.exit(0);
+  });
 });
