@@ -47,11 +47,27 @@ const log = {
 function setupDebugLogging() {
   const originalFetch = global.fetch;
   global.fetch = async function(...args: Parameters<typeof fetch>) {
-    log.debug('HTTP Request:', args[0].toString().substring(0, 80));
+    const url = args[0].toString();
+    const method = args[1]?.method || 'GET';
+    log.debug(`HTTP ${method} Request:`, url.substring(0, 80));
+    
+    // Log request headers if present
+    if (args[1]?.headers) {
+      log.debug('Request Headers:', args[1].headers);
+    }
     
     try {
       const response = await originalFetch(...args);
       log.debug(`HTTP Response: ${response.status} ${response.statusText}`);
+      
+      // Clone the response so we can read the body for debugging
+      // but only for error responses
+      if (!response.ok) {
+        const clonedResponse = response.clone();
+        const bodyText = await clonedResponse.text();
+        log.debug(`Response Body:`, bodyText.substring(0, 200));
+      }
+      
       return response;
     } catch (error) {
       log.error('HTTP Error:', error.message);
@@ -79,7 +95,10 @@ async function main() {
   
   // 2. Create auth provider and prepare for connection
   const authProvider = new TestAuthProvider();
-  log.info('Using access token:', (await authProvider.tokens()).access_token);
+  const tokens = await authProvider.tokens();
+  const tokenPreview = tokens.access_token.substring(0, 15) + '...';
+  log.info('Using access token:', tokenPreview);
+  log.debug('Auth provider ready with client ID:', (await authProvider.clientInformation()).client_id);
   
   try {
     // 3. Connect with auth provider
@@ -90,13 +109,22 @@ async function main() {
       setTimeout(() => reject(new Error('Connection timeout (20s)')), 20000);
     });
     
+    log.debug('Setting up MCP connection with the following configuration:');
+    log.debug(`- Server URL: ${SERVER_URL}/sse`);
+    log.debug('- Using auth provider with token type:', tokens.token_type);
+    log.debug('- Client protocol version: 2024-11-05');
+    log.debug('- Adding custom X-Test-Header for tracing');
+    
     const connectionPromise = convertMcpToLangchainTools({
       secureServer: {
         url: `${SERVER_URL}/sse`,
         sseOptions: {
           authProvider,
           requestInit: {
-            headers: { 'X-Test-Header': 'test-value' }
+            headers: { 
+              'X-Test-Header': 'test-value',
+              'Accept': 'application/json, text/event-stream' 
+            }
           }
         }
       }
@@ -130,8 +158,27 @@ async function main() {
     
   } catch (error) {
     log.error('Test failed:', error.message);
+    
+    // Enhanced error reporting
+    if (error.name === 'SseError') {
+      log.error('SSE Connection Error - Code:', error.code);
+      log.error('SSE Event details:', error.event);
+    } else if (error.name === 'UnauthorizedError') {
+      log.error('Authentication failure - verify your token is valid');
+      log.error('Token used:', (await authProvider.tokens()).access_token.substring(0, 10) + '...');
+    } else if (error.message.includes('protocol version')) {
+      log.error('Protocol version mismatch detected!');
+      log.error('This usually means the server and client are using different MCP protocol versions.');
+      log.info('Fix: Update the server to return the same protocol version that the client sends.');
+    }
+    
     if (error.details) log.error('Error details:', error.details);
-    if (error.stack) log.error('Stack trace:', error.stack);
+    if (error.stack) log.error('Stack trace:', error.stack.split('\n').slice(0, 3).join('\n'));
+    
+    log.info('Troubleshooting tips:');
+    log.info('1. Make sure the server is running at:', SERVER_URL);
+    log.info('2. Verify the token format matches what the server expects');
+    log.info('3. Check network connectivity and firewall settings');
   }
 }
 

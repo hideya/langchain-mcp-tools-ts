@@ -88,7 +88,9 @@ class SessionHandler {
     
     try {
       const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
-      console.log(`Sending SSE message to ${this.id}:`, dataStr);
+      // Truncate log output for large messages
+      const logOutput = dataStr.length > 100 ? dataStr.substring(0, 100) + '...' : dataStr;
+      console.log(`Sending SSE message to ${this.id}:`, logOutput);
       
       // Write the data with proper format
       this.res.write(`data: ${dataStr}\n\n`);
@@ -136,14 +138,17 @@ class SessionHandler {
       debug(`[${this.id}] Request:`, JSON.stringify(message));
       debug(`[${this.id}] Response:`, JSON.stringify(responseObj));
       
-      // Important: Send via HTTP
-      console.log(`Sending HTTP response for session ${this.id}`);
-      res.status(200).json(responseObj);
-      
-      // And also via SSE if it's not a notification (has ID)
+      // If it has an ID, it's a request (not a notification)
       if (message.id !== undefined) {
+        // Send response via SSE only
         console.log(`Sending SSE response for session ${this.id}`);
         this.send(responseObj);
+        
+        // Just acknowledge receipt via HTTP
+        res.status(200).json({ success: true });
+      } else {
+        // For notifications, just acknowledge via HTTP
+        res.status(200).json({ success: true });
       }
       
     } catch (error) {
@@ -173,11 +178,15 @@ class SessionHandler {
     if (message.method === "initialize") {
       console.log(`Handle initialize for session ${this.id}`);
       
+      // Use the same protocol version the client sends
+      const clientProtocolVersion = message.params?.protocolVersion || "2024-11-05";
+      console.log(`Using client-requested protocol version: ${clientProtocolVersion}`);
+      
       return {
         jsonrpc: "2.0",
         id: message.id,
         result: {
-          protocolVersion: "2024-11-05",
+          protocolVersion: clientProtocolVersion,
           capabilities: { tools: { listChanged: true } },
           serverInfo: { name: "MCP Dual Channel Server", version: "1.0.0" },
           tools: TOOLS
@@ -237,14 +246,39 @@ function authenticate(req, res, next) {
   
   const authHeader = req.headers.authorization;
   
-  // Accept any test token
-  if (authHeader && authHeader.startsWith('Bearer test_token_')) {
-    debug('Valid test token:', authHeader);
-    return next();
+  if (!authHeader) {
+    console.log('Missing authorization header');
+    return res.status(401).json({
+      error: {
+        code: 'missing_token',
+        message: 'Authorization header is required'
+      }
+    });
   }
   
-  console.log('Missing/invalid auth token');
-  return res.status(401).send('Unauthorized');
+  if (!authHeader.startsWith('Bearer ')) {
+    console.log('Invalid authorization format');
+    return res.status(401).json({
+      error: {
+        code: 'invalid_token_format',
+        message: 'Authorization header must use Bearer scheme'
+      }
+    });
+  }
+  
+  const token = authHeader.substring(7);
+  if (!token.startsWith('test_token_')) {
+    console.log('Invalid token value');
+    return res.status(401).json({
+      error: {
+        code: 'invalid_token',
+        message: 'Token is invalid or expired'
+      }
+    });
+  }
+  
+  debug('Valid test token:', authHeader);
+  return next();
 }
 
 // Basic token endpoint
