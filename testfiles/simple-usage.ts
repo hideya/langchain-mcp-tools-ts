@@ -3,9 +3,7 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
-import * as child_process from 'child_process';
 import * as fs from "fs";
-import WebSocket from "ws";  // needed only for WebSocket MCP test server
 
 import {
   convertMcpToLangchainTools,
@@ -23,11 +21,10 @@ export async function test(): Promise<void> {
   // If you are interested in testing the SSE/WS server setup, uncomment
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the one for the stdio server
+  //
   const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
     "SSE",  "npx -y @h1deya/mcp-server-weather");
-  // NOTE: without the following, I got this error:
-  // ReferenceError: WebSocket is not defined
-  //   at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
+  //
   global.WebSocket = WebSocket as any;
   const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
     "WS",  "npx -y @h1deya/mcp-server-weather");
@@ -89,7 +86,7 @@ export async function test(): Promise<void> {
 
     // If you are interested in MCP server's stderr redirection,
     // uncomment the following code snippets.
-
+    //
     // Set a file descriptor to which MCP server's stderr is redirected
     Object.keys(mcpServers).forEach(serverName => {
       if (mcpServers[serverName].command) {

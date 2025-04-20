@@ -156,11 +156,11 @@ const mcpServers = {
 };
 ```
 
-A simple but complete example showing how to implement an OAuth client provider can be found
-in the [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-client.ts) file.  
-Note that this is test code for this library and does not use the npm.js library.
+A simple example showing how to implement an OAuth client provider can be found
+in [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-client.ts) .  
 
-FYI, a sample MCP server with OAuth authentication support is also provided
+For testing purposes, a sample MCP server with OAuth authentication support
+that works with the above client is provided in
 in [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-server.ts).  
 
 ### Working Directory Configuration for Local MCP Servers
