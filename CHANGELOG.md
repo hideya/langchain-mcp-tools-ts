@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
-### Added
+### [0.2.2] - 2025-04-20
+
 - Add authentication support for SSE connections to MCP servers
 - Add test server and client for SSE connection with authentication
+
 
 ## [0.2.1] - 2025-04-11
 

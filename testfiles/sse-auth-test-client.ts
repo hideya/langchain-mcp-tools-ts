@@ -1,9 +1,5 @@
 import { convertMcpToLangchainTools } from '../src/langchain-mcp-tools';
 import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-// For node.js environments, we may need the EventSource polyfill
-import { EventSource } from 'eventsource';
-// Set global EventSource for Node.js environment
-global.EventSource = EventSource;
 
 // Enable maximum debug logging
 process.env.MCP_DEBUG = 'true';
@@ -47,7 +43,7 @@ const log = {
   success: (...args) => console.log('✅', ...args)
 };
 
-// Enhanced debug logging for HTTP and EventSource
+// Enhanced debug logging for HTTP
 function setupDebugLogging() {
   const originalFetch = global.fetch;
   global.fetch = async function(...args: Parameters<typeof fetch>) {

@@ -120,7 +120,8 @@ https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd527
 
 ### Authentication Support for SSE Connections
 
-The library now supports authentication for SSE connections to MCP servers. This is particularly useful for accessing authenticated MCP servers that require OAuth.
+The library now supports authentication for SSE connections to MCP servers.
+This is particularly useful for accessing authenticated MCP servers that require OAuth.
 
 To enable authentication, provide SSE options in your server configuration:
 
@@ -155,9 +156,12 @@ const mcpServers = {
 };
 ```
 
-A complete example showing how to implement an OAuth client provider can be found in the [auth-example.ts](./testfiles/auth-example.ts) file. You can run this example with `npm run auth-example`. 
+A simple but complete example showing how to implement an OAuth client provider can be found
+in the [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-client.ts) file.  
+Note that this is test code for this library and does not use the npm.js library.
 
-For testing purposes, a sample MCP server with OAuth authentication support is provided in [auth-test-server.ts](./testfiles/auth-test-server.ts). You can run this server with `npm run auth-test-server`.
+FYI, a sample MCP server with OAuth authentication support is also provided
+in [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-server.ts).  
 
 ### Working Directory Configuration for Local MCP Servers
 
