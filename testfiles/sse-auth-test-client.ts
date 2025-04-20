@@ -110,15 +110,18 @@ async function main() {
     log.info('Connecting to MCP with auth...');
     
     // Timeout after 60 seconds to give server time to respond
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Connection timeout (60s)')), 60000);
     });
     
     log.info('Using URL:', `${SERVER_URL}/sse`);
     log.info('Using access token type:', tokens.token_type);
     
+    // Define the result type
+    type ToolsResult = { tools: any[]; cleanup: () => Promise<void> };
+    
     // Simplify connection approach - use the MCP tools converter directly
-    const { tools, cleanup } = await Promise.race([
+    const { tools, cleanup } = await Promise.race<ToolsResult>([
       convertMcpToLangchainTools({
         secureServer: {
           url: `${SERVER_URL}/sse`,

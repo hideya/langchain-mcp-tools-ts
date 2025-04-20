@@ -10,10 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 - Add authentication support for SSE connections to MCP servers
-- Add example implementation of OAuth client provider in testfiles/auth-example.ts
-- Add `npm run auth-example` script to run the auth example
-- Add test server with OAuth support in testfiles/auth-test-server.ts
-- Add `npm run auth-test-server` script to run the test server
+- Add test server and client for SSE connection with authentication
 
 ## [0.2.1] - 2025-04-11
 
