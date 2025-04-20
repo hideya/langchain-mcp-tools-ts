@@ -1,5 +1,9 @@
 import { convertMcpToLangchainTools } from '../src/langchain-mcp-tools';
 import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+// For node.js environments, we may need the EventSource polyfill
+import { EventSource } from 'eventsource';
+// Set global EventSource for Node.js environment
+global.EventSource = EventSource;
 
 // Enable maximum debug logging
 process.env.MCP_DEBUG = 'true';
@@ -77,7 +81,7 @@ function setupDebugLogging() {
 }
 
 async function main() {
-  log.info('=== MCP SSE AUTH FINAL TEST ===');
+  log.info('=== MCP SSE AUTH TEST ===');
   setupDebugLogging();
   
   const SERVER_URL = 'http://127.0.0.1:3333';
@@ -100,40 +104,32 @@ async function main() {
   log.info('Using access token:', tokenPreview);
   log.debug('Auth provider ready with client ID:', (await authProvider.clientInformation()).client_id);
   
+  
   try {
     // 3. Connect with auth provider
     log.info('Connecting to MCP with auth...');
     
-    // Timeout after 20 seconds
+    // Timeout after 60 seconds to give server time to respond
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout (20s)')), 20000);
+      setTimeout(() => reject(new Error('Connection timeout (60s)')), 60000);
     });
     
-    log.debug('Setting up MCP connection with the following configuration:');
-    log.debug(`- Server URL: ${SERVER_URL}/sse`);
-    log.debug('- Using auth provider with token type:', tokens.token_type);
-    log.debug('- Client protocol version: 2024-11-05');
-    log.debug('- Adding custom X-Test-Header for tracing');
+    log.info('Using URL:', `${SERVER_URL}/sse`);
+    log.info('Using access token type:', tokens.token_type);
     
-    const connectionPromise = convertMcpToLangchainTools({
-      secureServer: {
-        url: `${SERVER_URL}/sse`,
-        sseOptions: {
-          authProvider,
-          requestInit: {
-            headers: { 
-              'X-Test-Header': 'test-value',
-              'Accept': 'application/json, text/event-stream' 
-            }
+    // Simplify connection approach - use the MCP tools converter directly
+    const { tools, cleanup } = await Promise.race([
+      convertMcpToLangchainTools({
+        secureServer: {
+          url: `${SERVER_URL}/sse`,
+          sseOptions: {
+            authProvider
           }
         }
-      }
-    });
+      }),
+      timeoutPromise
+    ]);
     
-    log.info('Waiting for connection to complete...');
-    const result = await Promise.race([connectionPromise, timeoutPromise]) as any;
-    
-    const { tools, cleanup } = result;
     log.success('Connection established successfully!');
     log.info('Available tools:', tools.map(t => t.name).join(', '));
     
@@ -156,24 +152,14 @@ async function main() {
     await cleanup();
     log.success('Test completed successfully!');
     
+    
   } catch (error) {
     log.error('Test failed:', error.message);
     
-    // Enhanced error reporting
-    if (error.name === 'SseError') {
-      log.error('SSE Connection Error - Code:', error.code);
-      log.error('SSE Event details:', error.event);
-    } else if (error.name === 'UnauthorizedError') {
-      log.error('Authentication failure - verify your token is valid');
-      log.error('Token used:', (await authProvider.tokens()).access_token.substring(0, 10) + '...');
-    } else if (error.message.includes('protocol version')) {
-      log.error('Protocol version mismatch detected!');
-      log.error('This usually means the server and client are using different MCP protocol versions.');
-      log.info('Fix: Update the server to return the same protocol version that the client sends.');
+    if (error.stack) {
+      const firstLine = error.stack.split('\n')[0];
+      log.error('Error details:', firstLine);
     }
-    
-    if (error.details) log.error('Error details:', error.details);
-    if (error.stack) log.error('Stack trace:', error.stack.split('\n').slice(0, 3).join('\n'));
     
     log.info('Troubleshooting tips:');
     log.info('1. Make sure the server is running at:', SERVER_URL);

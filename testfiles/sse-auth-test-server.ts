@@ -1,13 +1,15 @@
 import express from 'express';
 import cors from 'cors';
-import { v4 as uuidv4 } from 'uuid';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { z } from 'zod';
 
 const app = express();
 const PORT = 3333;
 const HOST = '0.0.0.0';
 
 // Store active SSE sessions
-const activeSessions = new Map();
+const transports = new Map();
 
 // Enable extra debugging
 const DEBUG = true;
@@ -22,223 +24,39 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Test-Header']
 }));
-app.use(express.json());
-app.use(express.text({ type: ['text/*', 'application/json'] }));
+
+// Only parse JSON for non-SSE endpoint requests
+const jsonParser = express.json({limit: '10mb'});
+app.use((req, res, next) => {
+  // Skip JSON parsing for the SSE POST endpoint
+  if (req.path === '/sse' && req.method === 'POST') {
+    return next();
+  }
+  // Apply JSON parsing for all other routes
+  return jsonParser(req, res, next);
+});
+
 app.use(express.urlencoded({ extended: true }));
 
-// Define one simple tool
-const TOOLS = [
-  {
-    name: "echo",
-    description: "Echo back the input",
-    inputSchema: {
-      type: "object",
-      properties: {
-        message: {
-          type: "string",
-          description: "Message to echo back"
-        }
-      },
-      required: ["message"]
-    }
-  }
-];
+// Create an MCP server instance
+const server = new McpServer({
+  name: "MCP SSE Auth Test Server",
+  version: "1.0.0"
+});
+
+// Add a simple echo tool
+server.tool(
+  "echo",
+  { message: z.string().describe("Message to echo back") },
+  async ({ message }) => ({
+    content: [{ type: "text", text: message }]
+  })
+);
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.send('MCP Dual-Channel Server Running');
+  res.send('MCP SSE Auth Test Server Running');
 });
-
-// Session handler
-class SessionHandler {
-  req;
-  res;
-  id;
-  isActive = true;
-  messageCount = 0;
-
-  constructor(req, res) {
-    this.req = req;
-    this.res = res;
-    this.id = uuidv4();
-    
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    
-    // Set up close handler
-    req.on('close', () => {
-      debug(`Client closed connection for session ${this.id}`);
-      this.close('client disconnected');
-    });
-    
-    req.on('error', (error) => {
-      console.error(`Error in session ${this.id}:`, error);
-      this.close('error');
-    });
-  }
-  
-  // Send a message through SSE
-  send(data) {
-    if (!this.isActive) {
-      debug(`Attempted to send message to inactive session ${this.id}`);
-      return;
-    }
-    
-    try {
-      const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
-      // Truncate log output for large messages
-      const logOutput = dataStr.length > 100 ? dataStr.substring(0, 100) + '...' : dataStr;
-      console.log(`Sending SSE message to ${this.id}:`, logOutput);
-      
-      // Write the data with proper format
-      this.res.write(`data: ${dataStr}\n\n`);
-      
-      // Try to flush if available
-      if (typeof this.res.flush === 'function') {
-        this.res.flush();
-      }
-      
-      this.messageCount++;
-    } catch (error) {
-      console.error(`Error sending message to ${this.id}:`, error);
-      this.close('send error');
-    }
-  }
-  
-  // Close the session
-  close(reason = 'unknown') {
-    if (!this.isActive) return;
-    
-    console.log(`Closing session ${this.id} - Reason: ${reason}`);
-    this.isActive = false;
-    
-    try {
-      this.res.end();
-    } catch (error) {
-      console.error(`Error closing session ${this.id}:`, error);
-    }
-    
-    activeSessions.delete(this.id);
-  }
-  
-  // Handle a POST message
-  async handlePostMessage(req, res) {
-    try {
-      const body = req.body;
-      console.log(`Received message for session ${this.id}:`, typeof body === 'string' ? body : JSON.stringify(body));
-      
-      const message = typeof body === 'string' ? JSON.parse(body) : body;
-      
-      // Process the message
-      const responseObj = await this.processMessage(message);
-      
-      // Log request and response for debugging
-      debug(`[${this.id}] Request:`, JSON.stringify(message));
-      debug(`[${this.id}] Response:`, JSON.stringify(responseObj));
-      
-      // If it has an ID, it's a request (not a notification)
-      if (message.id !== undefined) {
-        // Send response via SSE only
-        console.log(`Sending SSE response for session ${this.id}`);
-        this.send(responseObj);
-        
-        // Just acknowledge receipt via HTTP
-        res.status(200).json({ success: true });
-      } else {
-        // For notifications, just acknowledge via HTTP
-        res.status(200).json({ success: true });
-      }
-      
-    } catch (error) {
-      console.error(`Error handling message for session ${this.id}:`, error);
-      const errorResponse = {
-        jsonrpc: '2.0',
-        id: req.body?.id || null,
-        error: { code: -32603, message: `Error: ${error.message}` }
-      };
-      
-      res.status(500).json(errorResponse);
-      this.send(errorResponse);
-    }
-  }
-  
-  // Process MCP message
-  async processMessage(message) {
-    debug(`Processing message for session ${this.id}:`, message.method);
-    
-    // Handle notifications (no id)
-    if (message.id === undefined) {
-      // Just acknowledge and return early
-      debug(`Received notification: ${message.method}`);
-      return { success: true };
-    }
-    
-    if (message.method === "initialize") {
-      console.log(`Handle initialize for session ${this.id}`);
-      
-      // Use the same protocol version the client sends
-      const clientProtocolVersion = message.params?.protocolVersion || "2024-11-05";
-      console.log(`Using client-requested protocol version: ${clientProtocolVersion}`);
-      
-      return {
-        jsonrpc: "2.0",
-        id: message.id,
-        result: {
-          protocolVersion: clientProtocolVersion,
-          capabilities: { tools: { listChanged: true } },
-          serverInfo: { name: "MCP Dual Channel Server", version: "1.0.0" },
-          tools: TOOLS
-        }
-      };
-    } 
-    else if (message.method === "tools/list") {
-      console.log(`Handle tools/list for session ${this.id}`);
-      
-      return {
-        jsonrpc: "2.0",
-        id: message.id,
-        result: TOOLS
-      };
-    }
-    else if (message.method === "tools/execute" || message.method === "tools/call") {
-      console.log(`Handle tool call for session ${this.id}`);
-      
-      const params = message.params;
-      const name = params.name;
-      const toolParams = params.arguments || params.params;
-      
-      if (name === "echo") {
-        console.log(`Echo tool invoked with: "${toolParams.message}"`);
-        
-        return {
-          jsonrpc: "2.0",
-          id: message.id,
-          result: {
-            content: [
-              { type: "text", text: toolParams.message }
-            ]
-          }
-        };
-      }
-      else {
-        return {
-          jsonrpc: "2.0",
-          id: message.id,
-          error: { code: -32601, message: `Tool not found: ${name}` }
-        };
-      }
-    }
-    else {
-      return {
-        jsonrpc: "2.0",
-        id: message.id,
-        error: { code: -32601, message: `Method not found: ${message.method}` }
-      };
-    }
-  }
-}
 
 // Auth middleware
 function authenticate(req, res, next) {
@@ -302,47 +120,72 @@ app.post('/token', (req, res) => {
 app.get('/sse', authenticate, (req, res) => {
   console.log('SSE connection from:', req.headers['user-agent']);
   
-  const session = new SessionHandler(req, res);
-  activeSessions.set(session.id, session);
+  // Create a new SSE transport for this connection
+  const transport = new SSEServerTransport('/sse', res);
+  const sessionId = transport.sessionId;
+  transports.set(sessionId, transport);
   
-  console.log(`Session created: ${session.id}`);
+  console.log(`Session created: ${sessionId}`);
   
-  // Send endpoint URL - CRITICAL - This exact format is required
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const endpointUrl = `${baseUrl}/sse/${session.id}`;
+  // Setup cleanup when connection closes
+  req.on('close', () => {
+    console.log(`Client closed connection for session ${sessionId}`);
+    transports.delete(sessionId);
+    console.log(`Session ${sessionId} removed from transports map`);
+  });
   
-  console.log(`Sending endpoint URL: ${endpointUrl}`);
-  res.write("event: endpoint\n");
-  res.write(`data: ${endpointUrl}\n\n`);
-  
-  if (typeof res.flush === 'function') {
-    res.flush();
-  }
-  
-  // Send session status (but don't close the session)
-  session.send({ sessionId: session.id, status: "connected" });
+  // Connect the transport to our MCP server
+  server.connect(transport)
+    .then(() => {
+      console.log(`MCP server connected to transport ${sessionId}`);
+    })
+    .catch(error => {
+      console.error(`Error connecting MCP server:`, error);
+      // Add more detailed error info
+      if (error.stack) {
+        console.error('Stack trace:', error.stack);
+      }
+      transports.delete(sessionId);
+    });
 });
 
-// Handle messages
-app.post('/sse/:sessionId', authenticate, async (req, res) => {
-  const { sessionId } = req.params;
+// Handle messages endpoint - as query parameter (required by SSEServerTransport) 
+app.post('/sse', authenticate, async (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  
+  if (!sessionId) {
+    return res.status(400).json({
+      error: { code: 'missing_session_id', message: 'Session ID is required' }
+    });
+  }
   
   debug(`Received message for session: ${sessionId}`);
   debug('Headers:', req.headers);
-  debug('Body:', typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
   
-  const session = activeSessions.get(sessionId);
+  // Get the transport for this session
+  const transport = transports.get(sessionId);
   
-  if (!session) {
+  if (!transport) {
     console.log(`Session not found: ${sessionId}`);
     return res.status(404).json({
       jsonrpc: '2.0',
-      id: req.body?.id || null,
+      id: null,
       error: { code: -32001, message: 'Session not found' }
     });
   }
   
-  await session.handlePostMessage(req, res);
+  try {
+    // Simply let the transport handle the message
+    // It will handle parsing the body internally
+    await transport.handlePostMessage(req, res);
+  } catch (error) {
+    console.error(`Error handling message:`, error);
+    res.status(500).json({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32603, message: `Internal error: ${error.message}` }
+    });
+  }
 });
 
 // CORS preflight
@@ -353,8 +196,8 @@ app.options('*', cors({
 }));
 
 // Start server
-const server = app.listen(PORT, HOST, () => {
-  console.log(`MCP Dual-Channel Server running at http://${HOST}:${PORT}`);
+const server_instance = app.listen(PORT, HOST, () => {
+  console.log(`MCP SSE Auth Test Server running at http://${HOST}:${PORT}`);
   console.log(`For local testing, use: http://127.0.0.1:${PORT}`);
 });
 
@@ -362,11 +205,13 @@ const server = app.listen(PORT, HOST, () => {
 process.on('SIGINT', () => {
   console.log('\nShutting down...');
   
-  for (const [sessionId, session] of activeSessions.entries()) {
-    session.close('server shutdown');
+  // Close all active transports
+  for (const [sessionId, transport] of transports.entries()) {
+    console.log(`Closing transport for session ${sessionId}`);
+    transport.close();
   }
   
-  server.close(() => {
+  server_instance.close(() => {
     console.log('Server stopped');
     process.exit(0);
   });
