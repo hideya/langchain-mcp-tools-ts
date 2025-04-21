@@ -13,7 +13,13 @@ import { z } from "zod";
 import { Logger } from "./logger.js";
 
 
-interface CommandBasedConfig {
+/**
+ * Configuration for a command-line based MCP server.
+ * This is used for local MCP servers that are spawned as child processes.
+ *
+ * @public
+ */
+export interface CommandBasedConfig {
   url?: never;
   command: string;
   args?: string[];
@@ -22,7 +28,13 @@ interface CommandBasedConfig {
   cwd?: string;
 }
 
-interface UrlBasedConfig {
+/**
+ * Configuration for a URL-based MCP server.
+ * This is used for remote MCP servers that are accessed via HTTP/HTTPS (SSE) or WebSocket.
+ *
+ * @public
+ */
+export interface UrlBasedConfig {
   url: string;
   command?: never;
   args?: never;
@@ -40,10 +52,28 @@ interface UrlBasedConfig {
   };
 }
 
-type McpServerConfig = CommandBasedConfig | UrlBasedConfig;
+/**
+ * Configuration for an MCP server.
+ * Can be either a command-line based server or a URL-based server.
+ *
+ * @public
+ */
+export type SingleMcpServerConfig = CommandBasedConfig | UrlBasedConfig;
 
+/**
+ * A registry mapping server names to their respective configurations.
+ * This is used as the main parameter to convertMcpToLangchainTools().
+ *
+ * @example
+ * const serverRegistry: McpServersConfig = {
+ *   "filesystem": { command: "npx", args: ["@modelcontextprotocol/server-filesystem", "."] },
+ *   "fetch": { command: "uvx", args: ["mcp-server-fetch"] }
+ * };
+ *
+ * @public
+ */
 export interface McpServersConfig {
-  [key: string]: McpServerConfig;
+  [key: string]: SingleMcpServerConfig;
 }
 
 // Define a domain-specific logger interface
@@ -54,11 +84,22 @@ export interface McpToolsLogger {
   error(...args: unknown[]): void;
 }
 
-interface LogOptions {
+/**
+ * Options for configuring logging behavior.
+ *
+ * @public
+ */
+export interface LogOptions {
   logLevel?: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
 }
 
-interface McpError extends Error {
+/**
+ * Error interface for MCP-related errors.
+ * Extends the standard Error interface with MCP-specific properties.
+ *
+ * @public
+ */
+export interface McpError extends Error {
   serverName: string;
   details?: unknown;
 }
@@ -68,7 +109,13 @@ export interface McpServerCleanupFn {
 }
 
 // Custom error type for MCP server initialization failures
-class McpInitializationError extends Error implements McpError {
+/**
+ * Error thrown when an MCP server initialization fails.
+ * Contains details about the server that failed to initialize.
+ *
+ * @public
+ */
+export class McpInitializationError extends Error implements McpError {
   constructor(
     public serverName: string,
     message: string,
@@ -174,7 +221,7 @@ export async function convertMcpToLangchainTools(
  */
 async function convertSingleMcpToLangchainTools(
   serverName: string,
-  config: McpServerConfig,
+  config: SingleMcpServerConfig,
   logger: McpToolsLogger
 ): Promise<{
   tools: StructuredTool[];

@@ -1,12 +1,12 @@
-import express from 'express';
-import cors from 'cors';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { z } from 'zod';
+import express from "express";
+import cors from "cors";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { z } from "zod";
 
 const app = express();
 const PORT = 3333;
-const HOST = '0.0.0.0';
+const HOST = "0.0.0.0";
 
 // Store active SSE sessions
 const transports = new Map();
@@ -15,21 +15,21 @@ const transports = new Map();
 const DEBUG = true;
 function debug(...args) {
   if (DEBUG) {
-    console.log('[DEBUG]', ...args);
+    console.log("[DEBUG]", ...args);
   }
 }
 
 app.use(cors({ 
-  origin: '*', 
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Test-Header']
+  origin: "*", 
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Test-Header"]
 }));
 
 // Only parse JSON for non-SSE endpoint requests
-const jsonParser = express.json({limit: '10mb'});
+const jsonParser = express.json({limit: "10mb"});
 app.use((req, res, next) => {
   // Skip JSON parsing for the SSE POST endpoint
-  if (req.path === '/sse' && req.method === 'POST') {
+  if (req.path === "/sse" && req.method === "POST") {
     return next();
   }
   // Apply JSON parsing for all other routes
@@ -54,81 +54,81 @@ server.tool(
 );
 
 // Root endpoint
-app.get('/', (req, res) => {
-  res.send('MCP SSE Auth Test Server Running');
+app.get("/", (req, res) => {
+  res.send("MCP SSE Auth Test Server Running");
 });
 
 // Auth middleware
 function authenticate(req, res, next) {
-  debug('Authenticating request...');
+  debug("Authenticating request...");
   
   const authHeader = req.headers.authorization;
   
   if (!authHeader) {
-    console.log('Missing authorization header');
+    console.log("Missing authorization header");
     return res.status(401).json({
       error: {
-        code: 'missing_token',
-        message: 'Authorization header is required'
+        code: "missing_token",
+        message: "Authorization header is required"
       }
     });
   }
   
-  if (!authHeader.startsWith('Bearer ')) {
-    console.log('Invalid authorization format');
+  if (!authHeader.startsWith("Bearer ")) {
+    console.log("Invalid authorization format");
     return res.status(401).json({
       error: {
-        code: 'invalid_token_format',
-        message: 'Authorization header must use Bearer scheme'
+        code: "invalid_token_format",
+        message: "Authorization header must use Bearer scheme"
       }
     });
   }
   
   const token = authHeader.substring(7);
-  if (!token.startsWith('test_token_')) {
-    console.log('Invalid token value');
+  if (!token.startsWith("test_token_")) {
+    console.log("Invalid token value");
     return res.status(401).json({
       error: {
-        code: 'invalid_token',
-        message: 'Token is invalid or expired'
+        code: "invalid_token",
+        message: "Token is invalid or expired"
       }
     });
   }
   
-  debug('Valid test token:', authHeader);
+  debug("Valid test token:", authHeader);
   return next();
 }
 
 // Basic token endpoint
-app.post('/token', (req, res) => {
-  console.log('Token request:', req.body);
+app.post("/token", (req, res) => {
+  console.log("Token request:", req.body);
   
-  const clientId = req.body.client_id || 'test_client_id';
+  const clientId = req.body.client_id || "test_client_id";
   
   const tokens = {
     access_token: `test_token_${clientId}`,
-    token_type: 'Bearer',
+    token_type: "Bearer",
     expires_in: 3600,
     refresh_token: `refresh_token_${clientId}`
   };
   
-  console.log('Issuing tokens for client:', clientId);
+  console.log("Issuing tokens for client:", clientId);
   res.json(tokens);
 });
 
 // SSE endpoint
-app.get('/sse', authenticate, (req, res) => {
-  console.log('SSE connection from:', req.headers['user-agent']);
+app.get("/sse", authenticate, (req, res) => {
+  console.log("SSE connection from:", req.headers["user-agent"]);
   
   // Create a new SSE transport for this connection
-  const transport = new SSEServerTransport('/sse', res);
+  const transport = new SSEServerTransport("/sse", res);
   const sessionId = transport.sessionId;
   transports.set(sessionId, transport);
   
   console.log(`Session created: ${sessionId}`);
   
   // Setup cleanup when connection closes
-  req.on('close', () => {
+  req.on("close", () => {
     console.log(`Client closed connection for session ${sessionId}`);
     transports.delete(sessionId);
     console.log(`Session ${sessionId} removed from transports map`);
@@ -143,24 +143,24 @@ app.get('/sse', authenticate, (req, res) => {
       console.error(`Error connecting MCP server:`, error);
       // Add more detailed error info
       if (error.stack) {
-        console.error('Stack trace:', error.stack);
+        console.error("Stack trace:", error.stack);
       }
       transports.delete(sessionId);
     });
 });
 
 // Handle messages endpoint - as query parameter (required by SSEServerTransport) 
-app.post('/sse', authenticate, async (req, res) => {
+app.post("/sse", authenticate, async (req, res) => {
   const sessionId = req.query.sessionId as string;
   
   if (!sessionId) {
     return res.status(400).json({
-      error: { code: 'missing_session_id', message: 'Session ID is required' }
+      error: { code: "missing_session_id", message: "Session ID is required" }
     });
   }
   
   debug(`Received message for session: ${sessionId}`);
-  debug('Headers:', req.headers);
+  debug("Headers:", req.headers);
   
   // Get the transport for this session
   const transport = transports.get(sessionId);
@@ -168,9 +168,9 @@ app.post('/sse', authenticate, async (req, res) => {
   if (!transport) {
     console.log(`Session not found: ${sessionId}`);
     return res.status(404).json({
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id: null,
-      error: { code: -32001, message: 'Session not found' }
+      error: { code: -32001, message: "Session not found" }
     });
   }
   
@@ -181,7 +181,7 @@ app.post('/sse', authenticate, async (req, res) => {
   } catch (error) {
     console.error(`Error handling message:`, error);
     res.status(500).json({
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id: null,
       error: { code: -32603, message: `Internal error: ${error.message}` }
     });
@@ -189,10 +189,10 @@ app.post('/sse', authenticate, async (req, res) => {
 });
 
 // CORS preflight
-app.options('*', cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Test-Header']
+app.options("*", cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Test-Header"]
 }));
 
 // Start server
@@ -202,8 +202,8 @@ const server_instance = app.listen(PORT, HOST, () => {
 });
 
 // Handle shutdown
-process.on('SIGINT', () => {
-  console.log('\nShutting down...');
+process.on("SIGINT", () => {
+  console.log("\nShutting down...");
   
   // Close all active transports
   for (const [sessionId, transport] of transports.entries()) {
@@ -212,7 +212,7 @@ process.on('SIGINT', () => {
   }
   
   server_instance.close(() => {
-    console.log('Server stopped');
+    console.log("Server stopped");
     process.exit(0);
   });
 });

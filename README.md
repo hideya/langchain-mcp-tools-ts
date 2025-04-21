@@ -180,7 +180,7 @@ can be specified with the `"cwd"` key as follows:
 
 The key name `cwd` is derived from TypeScript SDK's `StdioServerParameters`.
 
-### Configuration for Local MCP Server `stderr` Redirection
+### `stderr` Redirection for Local MCP Server 
 
 A new key `"stderr"` has been introduced to specify a file descriptor
 to which local (stdio) MCP server's stderr is redirected.  
