@@ -23,11 +23,11 @@ The following will install all dependencies needed to develop and test:
 
 The project follows a simple and focused architecture:
 
-- **Core functionality**: The main module in the `src` directory contains the functionality to convert MCP server tools into LangChain tools.
+- **Core functionality**: The main file `src/langchain-mcp-tools.ts` contains the functionality to convert MCP server tools into LangChain tools.
 
 - **Key components**:
   - `convertMcpToLangchainTools`: The main entry point that handles parallel initialization of MCP servers and tool conversion
-  - `convertSingleMcpToLangchainTools`: Initializes a single MCP server and converts its capabilities into LangChain tools
+  - `convertSingleMcpToLangchainTools`: Initializes a single MCP server and converts its tools into LangChain tools
 
 - **Data flow**: 
   1. MCP server configurations are provided
