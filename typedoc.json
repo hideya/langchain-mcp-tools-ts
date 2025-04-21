@@ -1,0 +1,33 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "exclude": ["**/node_modules/**", "**/dist/**"],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeExternals": false,
+  "includeVersion": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/hideya/langchain-mcp-tools-ts",
+    "NPM": "https://www.npmjs.com/package/@h1deya/langchain-mcp-tools"
+  },
+  "plugin": [],
+  "githubPages": true,
+  "readme": "README.md",
+  "sort": ["source-order"],
+  "visibilityFilters": {
+    "protected": true,
+    "private": false,
+    "inherited": true,
+    "external": true
+  },
+  "searchInComments": true,
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Main",
+    "Configuration",
+    "Logging",
+    "Error Handling",
+    "*"
+  ]
+}
