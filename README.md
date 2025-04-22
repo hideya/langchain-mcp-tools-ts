@@ -42,6 +42,10 @@ A python equivalent of this utility is available
 npm i @h1deya/langchain-mcp-tools
 ```
 
+## API docs
+
+Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/)
+
 ## Quick Start
 
 A minimal but complete working usage example can be found

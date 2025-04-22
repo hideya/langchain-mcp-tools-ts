@@ -42,6 +42,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typedoc": "npx typedoc --options typedoc.json",
+    "deploy-docs": "npm run typedoc && ghp-import -n -p -f docs",
     "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env",
     "do-publish": "npm run clean && npm install && npm publish --access=public",
     "test-publish": "npm run clean && npm install && npm publish --access=public --dry-run"
