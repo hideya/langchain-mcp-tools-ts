@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+
+## [0.2.3] - 2025-04-22
+
 ### Added
 - Add TypeDoc configuration and improve API documentation
 - Add README_DEV.md

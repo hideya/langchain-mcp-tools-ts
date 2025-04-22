@@ -44,7 +44,7 @@ npm i @h1deya/langchain-mcp-tools
 
 ## API docs
 
-Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/)
+Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
 
 ## Quick Start
 
@@ -165,7 +165,7 @@ in [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts-us
 of [this usage examples repo](https://github.com/hideya/langchain-mcp-tools-ts-usage).
 
 For testing purposes, a sample MCP server with OAuth authentication support
-that works with the above client is provided in
+that works with the above client is provided
 in [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts-usage/tree/main/src/sse-auth-test-server.ts)
 of [this usage examples repo](https://github.com/hideya/langchain-mcp-tools-ts-usage).
 
