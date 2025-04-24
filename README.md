@@ -1,5 +1,15 @@
 # MCP To LangChain Tools Conversion Utility / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools)
 
+## NOTE
+
+LangChain's official **LangChain.js MCP Adapters** library has been released at:
+- npmjs: https://www.npmjs.com/package/@langchain/mcp-adapters
+- github: https://github.com/langchain-ai/langchainjs-mcp-adapters
+
+You may want to consider using the above if you don't have specific needs for using this library...
+
+## Introduction
+
 This package is intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools with LangChain / TypeScript.
@@ -182,13 +192,16 @@ can be specified with the `"cwd"` key as follows:
     },
 ```
 
-The key name `cwd` is derived from TypeScript SDK's `StdioServerParameters`.
+The key name `cwd` is derived from
+TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L39).
+
 
 ### `stderr` Redirection for Local MCP Server 
 
 A new key `"stderr"` has been introduced to specify a file descriptor
 to which local (stdio) MCP server's stderr is redirected.  
-The key name `stderr` is derived from TypeScript SDK's `StdioServerParameters`.
+The key name `stderr` is derived from
+TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L32).
 
 ```ts
     const logPath = `mcp-server-${serverName}.log`;
