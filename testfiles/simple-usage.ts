@@ -118,10 +118,14 @@ export async function test(): Promise<void> {
     mcpCleanup = cleanup
 
     // const llm = new ChatAnthropic({
-    //   model: "claude-3-7-sonnet-latest"
+    //   // https://docs.anthropic.com/en/docs/about-claude/pricing
+    //   model: "claude-3-5-haiku-latest"
+    //   // model: "claude-sonnet-4-0"
     // });
     const llm = new ChatOpenAI({
-      model: "o3-mini"
+      // https://platform.openai.com/docs/pricing
+      model: "gpt-4o-mini"
+      // model: "o4-mini"
     });
 
     const agent = createReactAgent({

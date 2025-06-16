@@ -202,6 +202,44 @@ export async function convertMcpToLangchainTools(
 }
 
 /**
+ * Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
+ *
+ * OpenAI's Structured Outputs feature requires that all optional fields must also be nullable.
+ * This function converts Zod schemas that use `.optional()` or `.default()` to also include
+ * `.nullable()`, ensuring compatibility with OpenAI models while maintaining compatibility
+ * with other LLM providers like Anthropic.
+ * See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
+ *
+ * @param schema - The Zod object schema to transform
+ * @returns A new Zod schema with optional/default fields made nullable
+ *
+ * @example
+ * // Input schema: z.object({ name: z.string(), age: z.number().optional() })
+ * // Output schema: z.object({ name: z.string(), age: z.number().optional().nullable() })
+ *
+ * @see {@link https://platform.openai.com/docs/guides/structured-outputs | OpenAI Structured Outputs Documentation}
+ */
+function makeZodSchemaOpenAICompatible(schema: z.ZodObject<any>): z.ZodObject<any> {
+  const shape = schema.shape;
+  const newShape: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(shape)) {
+    if (value instanceof z.ZodOptional && !(value instanceof z.ZodNullable)) {
+      // Convert .optional() to .optional().nullable() for OpenAI compatibility
+      newShape[key] = value.nullable();
+    } else if (value instanceof z.ZodDefault && !(value instanceof z.ZodNullable)) {
+      // Convert .default() to .default().nullable() for OpenAI compatibility
+      newShape[key] = value.nullable();
+    } else {
+      // Keep existing fields unchanged (including already nullable fields)
+      newShape[key] = value;
+    }
+  }
+
+  return z.object(newShape);
+}
+
+/**
  * Initializes a single MCP server and converts its capabilities into LangChain tools.
  * Sets up a connection to the server, retrieves available tools, and creates corresponding
  * LangChain tool instances.
@@ -308,7 +346,7 @@ async function convertSingleMcpToLangchainTools(
         description: tool.description || "",
         // FIXME
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        schema: jsonSchemaToZod(tool.inputSchema as JsonSchema) as z.ZodObject<any>,
+        schema: makeZodSchemaOpenAICompatible(jsonSchemaToZod(tool.inputSchema as JsonSchema)) as z.ZodObject<any>,
 
         func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);

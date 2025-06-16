@@ -8,11 +8,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Issue #34: Compatibility issue with OpenAI's Structured Outputs requirements
 
 ## [0.2.4] - 2025-04-24
 
 ### Changed
-- Update README.md
+- Update dependencies
+- Minor updates to README.md
 
 
 ## [0.2.3] - 2025-04-22
