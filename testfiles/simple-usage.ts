@@ -53,12 +53,12 @@ export async function test(): Promise<void> {
       //    "@h1deya/mcp-server-weather"
       //   ]
       // },
-      // weather: {
-      //   url: `http://localhost:${sseServerPort}/sse`
-      // },
       weather: {
-        url: `ws://localhost:${wsServerPort}/message`
+        url: `http://localhost:${sseServerPort}/sse`
       },
+      // weather: {
+      //   url: `ws://localhost:${wsServerPort}/message`
+      // },
 
       // sqlite: {
       //   command: "uvx",

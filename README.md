@@ -4,9 +4,9 @@
 
 LangChain's official **LangChain.js MCP Adapters** library has been released at:
 - npmjs: https://www.npmjs.com/package/@langchain/mcp-adapters
-- github: https://github.com/langchain-ai/langchainjs-mcp-adapters
+- github: https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-mcp-adapters`
 
-You may want to consider using the above if you don't have specific needs for using this library...
+You may want to consider using the above if you don't have specific needs for this library...
 
 ## Introduction
 
@@ -135,7 +135,7 @@ https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd527
 ### Authentication Support for SSE Connections
 
 The library now supports authentication for SSE connections to MCP servers.
-This is particularly useful for accessing authenticated MCP servers that require OAuth.
+This is particularly useful for accessing authenticated MCP servers that require OAuth 2.0.
 
 To enable authentication, provide SSE options in your server configuration:
 

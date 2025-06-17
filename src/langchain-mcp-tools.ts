@@ -3,6 +3,10 @@ import { Stream } from "node:stream";
 import { DynamicStructuredTool, StructuredTool } from "@langchain/core/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport, SSEClientTransportOptions } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport,
+    StreamableHTTPClientTransportOptions,
+    StreamableHTTPReconnectionOptions
+  } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -36,6 +40,7 @@ export interface CommandBasedConfig {
  */
 export interface UrlBasedConfig {
   url: string;
+  transport?: string;
   command?: never;
   args?: never;
   env?: never;
@@ -49,6 +54,12 @@ export interface UrlBasedConfig {
     eventSourceInit?: EventSourceInit;
     // Customizes recurring POST requests to the server
     requestInit?: RequestInit;
+  };
+  streamableHTTPOptions?: {
+    authProvider?: OAuthClientProvider;
+    requestInit?: RequestInit;
+    reconnectionOptions?: StreamableHTTPReconnectionOptions;
+    sessionId?: string;
   };
 }
 
@@ -218,6 +229,8 @@ export async function convertMcpToLangchainTools(
  * // Output schema: z.object({ name: z.string(), age: z.number().optional().nullable() })
  *
  * @see {@link https://platform.openai.com/docs/guides/structured-outputs | OpenAI Structured Outputs Documentation}
+ * 
+ * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
  */
 function makeZodSchemaOpenAICompatible(schema: z.ZodObject<any>): z.ZodObject<any> {
   const shape = schema.shape;
@@ -281,24 +294,50 @@ async function convertSingleMcpToLangchainTools(
     if (url?.protocol === "http:" || url?.protocol === "https:") {
       // Extract SSE options from config if available
       const urlConfig = config as UrlBasedConfig;
-      const sseOptions: SSEClientTransportOptions = {};
-      
-      if (urlConfig.sseOptions) {
-        if (urlConfig.sseOptions.authProvider) {
-          sseOptions.authProvider = urlConfig.sseOptions.authProvider;
-          logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
+      if (urlConfig.transport && urlConfig.transport === "StreamableHTTP") {
+        const options: StreamableHTTPClientTransportOptions = {};
+        
+        if (urlConfig.streamableHTTPOptions) {
+          if (urlConfig.streamableHTTPOptions.authProvider) {
+            options.authProvider = urlConfig.streamableHTTPOptions.authProvider;
+            logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
+          }
+          
+          if (urlConfig.streamableHTTPOptions.requestInit) {
+            options.requestInit = urlConfig.streamableHTTPOptions.requestInit;
+          }
+          
+          if (urlConfig.streamableHTTPOptions.reconnectionOptions) {
+            options.reconnectionOptions = urlConfig.streamableHTTPOptions.reconnectionOptions;
+          }
+
+          if (urlConfig.streamableHTTPOptions.sessionId) {
+            options.sessionId = urlConfig.streamableHTTPOptions.sessionId;
+          }
         }
         
-        if (urlConfig.sseOptions.eventSourceInit) {
-          sseOptions.eventSourceInit = urlConfig.sseOptions.eventSourceInit;
-        }
+        transport = new StreamableHTTPClientTransport(url, Object.keys(options).length > 0 ? options : undefined);
+
+      } else {
+        const sseOptions: SSEClientTransportOptions = {};
         
-        if (urlConfig.sseOptions.requestInit) {
-          sseOptions.requestInit = urlConfig.sseOptions.requestInit;
+        if (urlConfig.sseOptions) {
+          if (urlConfig.sseOptions.authProvider) {
+            sseOptions.authProvider = urlConfig.sseOptions.authProvider;
+            logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
+          }
+          
+          if (urlConfig.sseOptions.eventSourceInit) {
+            sseOptions.eventSourceInit = urlConfig.sseOptions.eventSourceInit;
+          }
+          
+          if (urlConfig.sseOptions.requestInit) {
+            sseOptions.requestInit = urlConfig.sseOptions.requestInit;
+          }
         }
+
+        transport = new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
       }
-      
-      transport = new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
 
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
       transport = new WebSocketClientTransport(url);
