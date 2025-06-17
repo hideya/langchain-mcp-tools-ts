@@ -147,6 +147,22 @@ For detailed information on how to use this library, please refer to the followi
 - If Streamable HTTP fails with a 4xx error, automatically falls back to SSE transport
 - Non-4xx errors (network issues, etc.) are re-thrown without fallback
 
+**Understanding Streamable HTTP vs SSE Transport:**
+
+Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE transport:
+
+- **Single Endpoint**: Both POST and GET requests are handled via one endpoint (e.g., `/mcp`)
+- **Flexible Streaming**: Server can respond with standard HTTP responses OR upgrade to Server-Sent Events (SSE) when streaming is needed
+- **Optional SSE**: Unlike the old transport, SSE is not required for every interaction
+- **Efficient**: Avoids persistent connections when simple request-response is sufficient
+
+In contrast, the older SSE transport:
+- Required separate endpoints for different message types
+- Always used persistent SSE connections for server-to-client messages
+- Less flexible and potentially less efficient
+
+When you see SSE activity in logs (like `Accept: text/event-stream`), this is the MCP SDK choosing to use SSE for streaming server responses within the Streamable HTTP transport - it's an implementation choice, not a protocol requirement.
+
 **Explicit transport selection:**
 - Set `transport: "streamable_http"` to force Streamable HTTP (no fallback)
 - Set `transport: "sse"` to force SSE transport
