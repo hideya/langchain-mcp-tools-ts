@@ -30,27 +30,40 @@
     "url": "git+https://github.com/hideya/langchain-mcp-tools-ts.git"
   },
   "scripts": {
+    "_comment_build": "# Build and development scripts",
     "build": "tsc",
     "prepare": "npm run build",
     "watch": "tsc --watch",
-    "simple-usage": "tsx testfiles/simple-usage.ts",
-    "direct-test": "tsx -- testfiles/direct-test.ts",
-    "sse-auth-test-client": "tsx testfiles/sse-auth-test-client.ts",
-    "sse-auth-test-server": "tsx testfiles/sse-auth-test-server.ts",
-    "streamable-http-auth-test-client": "tsx testfiles/streamable-http-auth-test-client.ts",
-    "streamable-http-auth-test-server": "tsx testfiles/streamable-http-auth-test-server.ts",
-    "streamable-http-stateless-test-client": "tsx testfiles/streamable-http-stateless-test-client.ts",
-    "streamable-http-stateless-test-server": "tsx testfiles/streamable-http-stateless-test-server.ts",
-    "test-streamable-http-auto-detection": "tsx testfiles/streamable-http-auto-detection-test.ts",
     "lint": "eslint src",
+    "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env",
+    
+    "_comment_test": "# Testing scripts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typedoc": "npx typedoc --options typedoc.json",
-    "deploy-docs": "npm run typedoc && ghp-import -n -p -f docs",
-    "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env",
-    "do-publish": "npm run clean && npm install && npm publish --access=public",
-    "test-publish": "npm run clean && npm install && npm publish --access=public --dry-run"
+    
+    "_comment_examples": "# Basic usage examples",
+    "example:simple": "tsx testfiles/simple-usage.ts",
+    "example:direct": "tsx -- testfiles/direct-test.ts",
+    
+    "_comment_sse": "# SSE transport tests (with authentication)",
+    "test:sse:server": "tsx testfiles/sse-auth-test-server.ts",
+    "test:sse:client": "tsx testfiles/sse-auth-test-client.ts",
+    
+    "_comment_streamable": "# Streamable HTTP transport tests",
+    "test:streamable:auth:server": "tsx testfiles/streamable-http-auth-test-server.ts",
+    "test:streamable:auth:client": "tsx testfiles/streamable-http-auth-test-client.ts",
+    "test:streamable:stateless:server": "tsx testfiles/streamable-http-stateless-test-server.ts",
+    "test:streamable:stateless:client": "tsx testfiles/streamable-http-stateless-test-client.ts",
+    "test:streamable:auto-detection": "tsx testfiles/streamable-http-auto-detection-test.ts",
+    
+    "_comment_docs": "# Documentation scripts",
+    "docs:build": "npx typedoc --options typedoc.json",
+    "docs:deploy": "npm run docs:build && ghp-import -n -p -f docs",
+    
+    "_comment_publish": "# Publishing scripts",
+    "publish:test": "npm run clean && npm install && npm publish --access=public --dry-run",
+    "publish:do": "npm run clean && npm install && npm publish --access=public"
   },
   "dependencies": {
     "@langchain/core": "^0.3.27",
