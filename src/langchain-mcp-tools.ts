@@ -574,7 +574,114 @@ async function convertSingleMcpToLangchainTools(
     if (url?.protocol === "http:" || url?.protocol === "https:") {
       // Use the new auto-detection logic with fallback
       const urlConfig = config as UrlBasedConfig;
-      transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
+      
+      // Try to connect with Streamable HTTP first, fallback to SSE on 4xx errors
+      let connectionSucceeded = false;
+      
+      // If transport is explicitly specified, respect user's choice (no fallback)
+      if (urlConfig.transport === "streamable_http" || urlConfig.transport === "sse") {
+        transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
+      } else {
+        // Auto-detection with connection-level fallback
+        logger.debug(`MCP server "${serverName}": attempting Streamable HTTP transport with SSE fallback`);
+        
+        try {
+          // First attempt: Streamable HTTP
+          const streamableOptions: StreamableHTTPClientTransportOptions = {};
+          
+          if (urlConfig.streamableHTTPOptions) {
+            if (urlConfig.streamableHTTPOptions.authProvider) {
+              streamableOptions.authProvider = urlConfig.streamableHTTPOptions.authProvider;
+              logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
+            }
+            
+            if (urlConfig.streamableHTTPOptions.requestInit) {
+              streamableOptions.requestInit = urlConfig.streamableHTTPOptions.requestInit;
+            }
+            
+            if (urlConfig.streamableHTTPOptions.reconnectionOptions) {
+              streamableOptions.reconnectionOptions = urlConfig.streamableHTTPOptions.reconnectionOptions;
+            }
+
+            if (urlConfig.streamableHTTPOptions.sessionId) {
+              streamableOptions.sessionId = urlConfig.streamableHTTPOptions.sessionId;
+            }
+          }
+          
+          transport = new StreamableHTTPClientTransport(url, Object.keys(streamableOptions).length > 0 ? streamableOptions : undefined);
+          logger.info(`MCP server "${serverName}": created Streamable HTTP transport, attempting connection`);
+          
+          // Try to connect with Streamable HTTP
+          client = new Client(
+            {
+              name: "mcp-client",
+              version: "0.0.1",
+            },
+            {
+              capabilities: {},
+            }
+          );
+          
+          await client.connect(transport);
+          connectionSucceeded = true;
+          logger.info(`MCP server "${serverName}": successfully connected using Streamable HTTP`);
+          
+        } catch (error) {
+          if (is4xxError(error)) {
+            logger.info(`MCP server "${serverName}": Streamable HTTP failed with 4xx error, falling back to SSE transport`);
+            
+            // Cleanup failed transport and client
+            if (transport) {
+              try {
+                await transport.close();
+              } catch (cleanupError) {
+                logger.debug(`MCP server "${serverName}": cleanup error during fallback:`, cleanupError);
+              }
+            }
+            
+            // Fallback to SSE
+            const sseOptions: SSEClientTransportOptions = {};
+            
+            if (urlConfig.sseOptions) {
+              if (urlConfig.sseOptions.authProvider) {
+                sseOptions.authProvider = urlConfig.sseOptions.authProvider;
+                logger.info(`MCP server "${serverName}": configuring SSE fallback with authentication provider`);
+              }
+              
+              if (urlConfig.sseOptions.eventSourceInit) {
+                sseOptions.eventSourceInit = urlConfig.sseOptions.eventSourceInit;
+              }
+              
+              if (urlConfig.sseOptions.requestInit) {
+                sseOptions.requestInit = urlConfig.sseOptions.requestInit;
+              }
+            }
+            
+            transport = new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
+            logger.info(`MCP server "${serverName}": created SSE transport, attempting fallback connection`);
+            
+            // Create new client for SSE connection
+            client = new Client(
+              {
+                name: "mcp-client",
+                version: "0.0.1",
+              },
+              {
+                capabilities: {},
+              }
+            );
+            
+            await client.connect(transport);
+            connectionSucceeded = true;
+            logger.info(`MCP server "${serverName}": successfully connected using SSE fallback`);
+            
+          } else {
+            // Re-throw non-4xx errors (network issues, etc.)
+            logger.error(`MCP server "${serverName}": Streamable HTTP transport failed with non-4xx error:`, error);
+            throw error;
+          }
+        }
+      }
 
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
       transport = new WebSocketClientTransport(url);
@@ -598,18 +705,21 @@ async function convertSingleMcpToLangchainTools(
       });
     }
 
-    client = new Client(
-      {
-        name: "mcp-client",
-        version: "0.0.1",
-      },
-      {
-        capabilities: {},
-      }
-    );
+    // Only create client if not already created during auto-detection fallback
+    if (!client) {
+      client = new Client(
+        {
+          name: "mcp-client",
+          version: "0.0.1",
+        },
+        {
+          capabilities: {},
+        }
+      );
 
-    await client.connect(transport);
-    logger.info(`MCP server "${serverName}": connected`);
+      await client.connect(transport);
+      logger.info(`MCP server "${serverName}": connected`);
+    }
 
     const toolsResponse = await client.request(
       { method: "tools/list" },
