@@ -2,10 +2,12 @@
 
 ## NOTE
 
-LangChain's official **LangChain.js MCP Adapters** library has been released at:
+LangChain's **official LangChain.js MCP Adapters** library has been released at:
 - npmjs: https://www.npmjs.com/package/@langchain/mcp-adapters
 - github: https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-mcp-adapters`
 
+This library is very simple and lightweight.
+It only supports text results of tool calls, and it does not support MCP features other than Tools.  
 You may want to consider using the above if you don't have specific needs for this library...
 
 ## Introduction

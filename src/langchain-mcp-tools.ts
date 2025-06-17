@@ -213,6 +213,116 @@ export async function convertMcpToLangchainTools(
 }
 
 /**
+ * Sanitizes a JSON Schema to make it compatible with Google Gemini API.
+ * 
+ * ⚠️  IMPORTANT: This is a temporary workaround to keep applications running.
+ *     The underlying schema compatibility issues should be fixed on the MCP server side
+ *     for proper Google LLM compatibility. This function will log warnings when
+ *     performing schema conversions to help track which servers need upstream fixes.
+ * 
+ * Gemini supports only a limited subset of OpenAPI 3.0 Schema properties:
+ * - string: enum, format (only 'date-time' documented)  
+ * - integer/number: format only
+ * - array: minItems, maxItems, items
+ * - object: properties, required, propertyOrdering, nullable
+ * 
+ * This function removes known problematic properties while preserving
+ * as much validation as possible. When debug logging is enabled,
+ * it reports what schema changes were made for transparency.
+ * 
+ * Reference: https://ai.google.dev/gemini-api/docs/structured-output#json-schemas
+ *
+ * @param schema - The JSON schema to sanitize
+ * @param logger - Optional logger for reporting sanitization actions
+ * @param toolName - Optional tool name for logging context
+ * @returns A sanitized schema compatible with all major LLM providers
+ * 
+ * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
+ */
+function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?: string): any {
+  if (typeof schema !== 'object' || schema === null) {
+    return schema;
+  }
+  
+  const sanitized = { ...schema };
+  const removedProperties: string[] = [];
+  const convertedProperties: string[] = [];
+  
+  // Remove unsupported properties
+  if (sanitized.exclusiveMinimum !== undefined) {
+    removedProperties.push('exclusiveMinimum');
+    delete sanitized.exclusiveMinimum;
+  }
+  if (sanitized.exclusiveMaximum !== undefined) {
+    removedProperties.push('exclusiveMaximum');
+    delete sanitized.exclusiveMaximum;
+  }
+  
+  // Convert exclusiveMinimum/Maximum to minimum/maximum if needed
+  if (schema.exclusiveMinimum !== undefined) {
+    sanitized.minimum = schema.exclusiveMinimum;
+    convertedProperties.push('exclusiveMinimum → minimum');
+  }
+  if (schema.exclusiveMaximum !== undefined) {
+    sanitized.maximum = schema.exclusiveMaximum;
+    convertedProperties.push('exclusiveMaximum → maximum');
+  }
+  
+  // Remove unsupported string formats (Gemini only supports 'enum' and 'date-time')
+  if (sanitized.type === 'string' && sanitized.format) {
+    const supportedFormats = ['enum', 'date-time'];
+    if (!supportedFormats.includes(sanitized.format)) {
+      removedProperties.push(`format: ${sanitized.format}`);
+      delete sanitized.format;
+    }
+  }
+  
+  // Log sanitization actions for this level
+  if (logger && toolName && (removedProperties.length > 0 || convertedProperties.length > 0)) {
+    const changes = [];
+    if (removedProperties.length > 0) {
+      changes.push(`removed: ${removedProperties.join(', ')}`);
+    }
+    if (convertedProperties.length > 0) {
+      changes.push(`converted: ${convertedProperties.join(', ')}`);
+    }
+    logger.warn(`MCP tool "${toolName}": schema sanitized for Gemini compatibility (${changes.join('; ')})`);
+  }
+  
+  // Recursively process nested objects and arrays
+  if (sanitized.properties) {
+    sanitized.properties = Object.fromEntries(
+      Object.entries(sanitized.properties).map(([key, value]) => [
+        key,
+        sanitizeSchemaForGemini(value, logger, toolName)
+      ])
+    );
+  }
+  
+  if (sanitized.anyOf) {
+    sanitized.anyOf = sanitized.anyOf.map((subSchema: any) => sanitizeSchemaForGemini(subSchema, logger, toolName));
+  }
+  
+  if (sanitized.oneOf) {
+    sanitized.oneOf = sanitized.oneOf.map((subSchema: any) => sanitizeSchemaForGemini(subSchema, logger, toolName));
+  }
+  
+  if (sanitized.allOf) {
+    sanitized.allOf = sanitized.allOf.map((subSchema: any) => sanitizeSchemaForGemini(subSchema, logger, toolName));
+  }
+  
+  if (sanitized.items) {
+    sanitized.items = sanitizeSchemaForGemini(sanitized.items, logger, toolName);
+  }
+  
+  if (sanitized.additionalProperties && typeof sanitized.additionalProperties === 'object') {
+    sanitized.additionalProperties = sanitizeSchemaForGemini(sanitized.additionalProperties, logger, toolName);
+  }
+  
+  return sanitized;
+}
+
+/**
  * Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
  *
  * OpenAI's Structured Outputs feature requires that all optional fields must also be nullable.
@@ -379,13 +489,19 @@ async function convertSingleMcpToLangchainTools(
       ListToolsResultSchema
     );
 
-    const tools = toolsResponse.tools.map((tool) => (
-      new DynamicStructuredTool({
+    const tools = toolsResponse.tools.map((tool) => {
+      // Apply sanitization for all LLMs (harmless for non-Gemini providers)
+      const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
+      const baseSchema = jsonSchemaToZod(sanitizedSchema as JsonSchema) as z.ZodObject<any>;
+      // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
+      const compatibleSchema = makeZodSchemaOpenAICompatible(baseSchema);
+      
+      return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
         // FIXME
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        schema: makeZodSchemaOpenAICompatible(jsonSchemaToZod(tool.inputSchema as JsonSchema)) as z.ZodObject<any>,
+        schema: compatibleSchema,
 
         func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
@@ -430,8 +546,8 @@ async function convertSingleMcpToLangchainTools(
               return `Error executing MCP tool: ${error}`;
           }
         },
-      })
-    ));
+      });
+    });
 
     logger.info(`MCP server "${serverName}": ${tools.length} tool(s) available:`);
     tools.forEach((tool) => logger.info(`- ${tool.name}`));
