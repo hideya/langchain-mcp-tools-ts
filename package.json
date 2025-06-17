@@ -39,6 +39,8 @@
     "sse-auth-test-server": "tsx testfiles/sse-auth-test-server.ts",
     "streamable-http-auth-test-client": "tsx testfiles/streamable-http-auth-test-client.ts",
     "streamable-http-auth-test-server": "tsx testfiles/streamable-http-auth-test-server.ts",
+    "streamable-http-stateless-test-client": "tsx testfiles/streamable-http-stateless-test-client.ts",
+    "streamable-http-stateless-test-server": "tsx testfiles/streamable-http-stateless-test-server.ts",
     "test-streamable-http-auto-detection": "tsx testfiles/streamable-http-auto-detection-test.ts",
     "lint": "eslint src",
     "test": "vitest run",
