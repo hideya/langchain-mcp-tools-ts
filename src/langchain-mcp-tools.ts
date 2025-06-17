@@ -323,6 +323,176 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
 }
 
 /**
+ * Determines if an error represents a 4xx HTTP status code.
+ * Used to decide whether to fall back from Streamable HTTP to SSE transport.
+ *
+ * @param error - The error to check
+ * @returns true if the error represents a 4xx HTTP status
+ * 
+ * @internal This function is meant to be used internally by createHttpTransportWithFallback
+ */
+function is4xxError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  
+  // Check for common error patterns that indicate 4xx responses
+  const errorObj = error as any;
+  
+  // Check if it's a fetch Response error with status
+  if (errorObj.status && typeof errorObj.status === 'number') {
+    return errorObj.status >= 400 && errorObj.status < 500;
+  }
+  
+  // Check if it's wrapped in a Response object
+  if (errorObj.response && errorObj.response.status && typeof errorObj.response.status === 'number') {
+    return errorObj.response.status >= 400 && errorObj.response.status < 500;
+  }
+  
+  // Check for error messages that typically indicate 4xx errors
+  const message = errorObj.message || errorObj.toString();
+  if (typeof message === 'string') {
+    return /4[0-9]{2}/.test(message) || 
+           message.includes('Bad Request') ||
+           message.includes('Unauthorized') ||
+           message.includes('Forbidden') ||
+           message.includes('Not Found') ||
+           message.includes('Method Not Allowed');
+  }
+  
+  return false;
+}
+
+/**
+ * Creates an HTTP transport with automatic fallback from Streamable HTTP to SSE.
+ * Follows the MCP specification recommendation to try Streamable HTTP first,
+ * then fall back to SSE if a 4xx error is encountered.
+ *
+ * See: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility
+ *
+ * @param url - The URL to connect to
+ * @param config - URL-based server configuration
+ * @param logger - Logger instance for recording connection attempts
+ * @param serverName - Server name for logging context
+ * @returns A promise that resolves to a configured Transport
+ * 
+ * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
+ */
+async function createHttpTransportWithFallback(
+  url: URL,
+  config: UrlBasedConfig,
+  logger: McpToolsLogger,
+  serverName: string
+): Promise<Transport> {
+  // If transport is explicitly specified, respect user's choice
+  if (config.transport === "streamable_http") {
+    logger.debug(`MCP server "${serverName}": using explicitly configured Streamable HTTP transport`);
+    const options: StreamableHTTPClientTransportOptions = {};
+    
+    if (config.streamableHTTPOptions) {
+      if (config.streamableHTTPOptions.authProvider) {
+        options.authProvider = config.streamableHTTPOptions.authProvider;
+        logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
+      }
+      
+      if (config.streamableHTTPOptions.requestInit) {
+        options.requestInit = config.streamableHTTPOptions.requestInit;
+      }
+      
+      if (config.streamableHTTPOptions.reconnectionOptions) {
+        options.reconnectionOptions = config.streamableHTTPOptions.reconnectionOptions;
+      }
+
+      if (config.streamableHTTPOptions.sessionId) {
+        options.sessionId = config.streamableHTTPOptions.sessionId;
+      }
+    }
+    
+    return new StreamableHTTPClientTransport(url, Object.keys(options).length > 0 ? options : undefined);
+  }
+  
+  if (config.transport === "sse") {
+    logger.debug(`MCP server "${serverName}": using explicitly configured SSE transport`);
+    const sseOptions: SSEClientTransportOptions = {};
+    
+    if (config.sseOptions) {
+      if (config.sseOptions.authProvider) {
+        sseOptions.authProvider = config.sseOptions.authProvider;
+        logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
+      }
+      
+      if (config.sseOptions.eventSourceInit) {
+        sseOptions.eventSourceInit = config.sseOptions.eventSourceInit;
+      }
+      
+      if (config.sseOptions.requestInit) {
+        sseOptions.requestInit = config.sseOptions.requestInit;
+      }
+    }
+    
+    return new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
+  }
+  
+  // Auto-detection: try Streamable HTTP first, fall back to SSE on 4xx errors
+  logger.debug(`MCP server "${serverName}": attempting Streamable HTTP transport with SSE fallback`);
+  
+  try {
+    const streamableOptions: StreamableHTTPClientTransportOptions = {};
+    
+    if (config.streamableHTTPOptions) {
+      if (config.streamableHTTPOptions.authProvider) {
+        streamableOptions.authProvider = config.streamableHTTPOptions.authProvider;
+        logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
+      }
+      
+      if (config.streamableHTTPOptions.requestInit) {
+        streamableOptions.requestInit = config.streamableHTTPOptions.requestInit;
+      }
+      
+      if (config.streamableHTTPOptions.reconnectionOptions) {
+        streamableOptions.reconnectionOptions = config.streamableHTTPOptions.reconnectionOptions;
+      }
+
+      if (config.streamableHTTPOptions.sessionId) {
+        streamableOptions.sessionId = config.streamableHTTPOptions.sessionId;
+      }
+    }
+    
+    const transport = new StreamableHTTPClientTransport(url, Object.keys(streamableOptions).length > 0 ? streamableOptions : undefined);
+    logger.info(`MCP server "${serverName}": successfully created Streamable HTTP transport`);
+    return transport;
+    
+  } catch (error) {
+    if (is4xxError(error)) {
+      logger.info(`MCP server "${serverName}": Streamable HTTP failed with 4xx error, falling back to SSE transport`);
+      
+      const sseOptions: SSEClientTransportOptions = {};
+      
+      if (config.sseOptions) {
+        if (config.sseOptions.authProvider) {
+          sseOptions.authProvider = config.sseOptions.authProvider;
+          logger.info(`MCP server "${serverName}": configuring SSE fallback with authentication provider`);
+        }
+        
+        if (config.sseOptions.eventSourceInit) {
+          sseOptions.eventSourceInit = config.sseOptions.eventSourceInit;
+        }
+        
+        if (config.sseOptions.requestInit) {
+          sseOptions.requestInit = config.sseOptions.requestInit;
+        }
+      }
+      
+      return new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
+    }
+    
+    // Re-throw non-4xx errors (network issues, etc.)
+    logger.error(`MCP server "${serverName}": Streamable HTTP transport creation failed with non-4xx error:`, error);
+    throw error;
+  }
+}
+
+/**
  * Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
  *
  * OpenAI's Structured Outputs feature requires that all optional fields must also be nullable.
@@ -402,52 +572,9 @@ async function convertSingleMcpToLangchainTools(
     }
   
     if (url?.protocol === "http:" || url?.protocol === "https:") {
-      // Extract SSE options from config if available
+      // Use the new auto-detection logic with fallback
       const urlConfig = config as UrlBasedConfig;
-      if (urlConfig.transport && urlConfig.transport === "StreamableHTTP") {
-        const options: StreamableHTTPClientTransportOptions = {};
-        
-        if (urlConfig.streamableHTTPOptions) {
-          if (urlConfig.streamableHTTPOptions.authProvider) {
-            options.authProvider = urlConfig.streamableHTTPOptions.authProvider;
-            logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
-          }
-          
-          if (urlConfig.streamableHTTPOptions.requestInit) {
-            options.requestInit = urlConfig.streamableHTTPOptions.requestInit;
-          }
-          
-          if (urlConfig.streamableHTTPOptions.reconnectionOptions) {
-            options.reconnectionOptions = urlConfig.streamableHTTPOptions.reconnectionOptions;
-          }
-
-          if (urlConfig.streamableHTTPOptions.sessionId) {
-            options.sessionId = urlConfig.streamableHTTPOptions.sessionId;
-          }
-        }
-        
-        transport = new StreamableHTTPClientTransport(url, Object.keys(options).length > 0 ? options : undefined);
-
-      } else {
-        const sseOptions: SSEClientTransportOptions = {};
-        
-        if (urlConfig.sseOptions) {
-          if (urlConfig.sseOptions.authProvider) {
-            sseOptions.authProvider = urlConfig.sseOptions.authProvider;
-            logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
-          }
-          
-          if (urlConfig.sseOptions.eventSourceInit) {
-            sseOptions.eventSourceInit = urlConfig.sseOptions.eventSourceInit;
-          }
-          
-          if (urlConfig.sseOptions.requestInit) {
-            sseOptions.requestInit = urlConfig.sseOptions.requestInit;
-          }
-        }
-
-        transport = new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
-      }
+      transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
 
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
       transport = new WebSocketClientTransport(url);

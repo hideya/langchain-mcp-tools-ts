@@ -115,17 +115,42 @@ For detailed information on how to use this library, please refer to the followi
 
 ### Remote MCP Server Support
 
-`mcp_servers` configuration for SSE and Websocket servers are as follows:
+`mcp_servers` configuration for Streamable HTTP, SSE and Websocket servers are as follows:
 
 ```ts
-    "sse-server-name": {
-        url: `http://${sse_server_host}:${sse_server_port}/...`
+    // Auto-detection: tries Streamable HTTP first, falls back to SSE on 4xx errors
+    "auto-detect-server": {
+        url: `http://${server_host}:${server_port}/...`
     },
 
+    // Explicit Streamable HTTP
+    "streamable-http-server": {
+        url: `http://${server_host}:${server_port}/...`,
+        transport: "streamable_http"
+    },
+
+    // Explicit SSE
+    "sse-server-name": {
+        url: `http://${sse_server_host}:${sse_server_port}/...`,
+        transport: "sse"
+    },
+
+    // WebSocket
     "ws-server-name": {
         url: `ws://${ws_server_host}:${ws_server_port}/...`
     },
 ```
+
+**Auto-detection behavior (default):**
+- For HTTP/HTTPS URLs without explicit `transport`, the library follows [MCP specification recommendations](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility)
+- First attempts Streamable HTTP transport
+- If Streamable HTTP fails with a 4xx error, automatically falls back to SSE transport
+- Non-4xx errors (network issues, etc.) are re-thrown without fallback
+
+**Explicit transport selection:**
+- Set `transport: "streamable_http"` to force Streamable HTTP (no fallback)
+- Set `transport: "sse"` to force SSE transport
+- WebSocket URLs (`ws://` or `wss://`) always use WebSocket transport
 
 Note that the key `"url"` may be changed in the future to match
 the MCP server configurations used by Claude for Desktop once

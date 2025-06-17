@@ -54,9 +54,22 @@ export async function test(): Promise<void> {
       //    "@h1deya/mcp-server-weather"
       //   ]
       // },
+      
+      // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
       weather: {
         url: `http://localhost:${sseServerPort}/sse`
       },
+      
+      // Example of explicit transport selection:
+      // weather: {
+      //   url: `http://localhost:${sseServerPort}/sse`,
+      //   transport: "streamable_http"  // Force Streamable HTTP
+      // },
+      
+      // weather: {
+      //   url: `http://localhost:${sseServerPort}/sse`,
+      //   transport: "sse"  // Force SSE
+      // },
       // weather: {
       //   url: `ws://localhost:${wsServerPort}/message`
       // },
@@ -143,7 +156,7 @@ export async function test(): Promise<void> {
     console.log("\nLLM model:", llm.constructor.name, llm.model);
     console.log("\x1b[0m");  // reset the color
 
-    // const query = "Hello, how are you?";
+    // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me the number of directories in the current directory";
