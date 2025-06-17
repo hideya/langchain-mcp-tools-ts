@@ -197,14 +197,58 @@ const mcpServers = {
 };
 ```
 
-A simple example showing how to implement an OAuth client provider can be found
-in [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts-usage/tree/main/src/sse-auth-test-client.ts)
-of [this usage examples repo](https://github.com/hideya/langchain-mcp-tools-ts-usage).
+### Authentication Support for Streamable HTTP Connections
 
-For testing purposes, a sample MCP server with OAuth authentication support
-that works with the above client is provided
-in [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts-usage/tree/main/src/sse-auth-test-server.ts)
-of [this usage examples repo](https://github.com/hideya/langchain-mcp-tools-ts-usage).
+Similarly, the library supports authentication for Streamable HTTP connections:
+
+```ts
+const mcpServers = {
+  "secure-streamable-server": {
+    url: "https://secure-mcp-server.example.com/mcp",
+    transport: "streamable_http",  // Optional: explicit transport
+    streamableHTTPOptions: {
+      // Provide an OAuth client provider
+      authProvider: new MyOAuthProvider(),
+      
+      // Optionally customize HTTP requests
+      requestInit: {
+        headers: {
+          'X-Custom-Header': 'custom-value'
+        }
+      },
+      
+      // Optionally configure reconnection behavior
+      reconnectionOptions: {
+        maxReconnectAttempts: 5,
+        reconnectDelay: 1000
+      }
+    }
+  }
+};
+```
+
+**Testing Authentication:**
+
+Example implementations and test servers are provided:
+
+- **SSE Authentication**: `sse-auth-test-server.ts` and `sse-auth-test-client.ts`
+- **Streamable HTTP Authentication**: `streamable-http-auth-test-server.ts` and `streamable-http-auth-test-client.ts`
+
+To test:
+```bash
+# Terminal 1: Start SSE auth test server
+npm run sse-auth-test-server
+
+# Terminal 2: Run SSE auth test client
+npm run sse-auth-test-client
+
+# Or test Streamable HTTP authentication:
+# Terminal 1: Start Streamable HTTP auth test server
+npm run streamable-http-auth-test-server
+
+# Terminal 2: Run Streamable HTTP auth test client
+npm run streamable-http-auth-test-client
+```
 
 ### Working Directory Configuration for Local MCP Servers
 

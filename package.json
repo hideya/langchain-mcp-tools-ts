@@ -37,6 +37,8 @@
     "direct-test": "tsx -- testfiles/direct-test.ts",
     "sse-auth-test-client": "tsx testfiles/sse-auth-test-client.ts",
     "sse-auth-test-server": "tsx testfiles/sse-auth-test-server.ts",
+    "streamable-http-auth-test-client": "tsx testfiles/streamable-http-auth-test-client.ts",
+    "streamable-http-auth-test-server": "tsx testfiles/streamable-http-auth-test-server.ts",
     "test-streamable-http-auto-detection": "tsx testfiles/streamable-http-auto-detection-test.ts",
     "lint": "eslint src",
     "test": "vitest run",
