@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
 import * as fs from "fs";
 
@@ -53,12 +54,26 @@ export async function test(): Promise<void> {
       //    "@h1deya/mcp-server-weather"
       //   ]
       // },
-      // weather: {
-      //   url: `http://localhost:${sseServerPort}/sse`
-      // },
+      
+      // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
       weather: {
-        url: `ws://localhost:${wsServerPort}/message`
+        url: `http://localhost:${sseServerPort}/sse`
       },
+      
+      // Example of explicit transport selection:
+      // weather: {
+      //   url: `http://localhost:${sseServerPort}/sse`,
+      //   transport: "streamable_http"  // Force Streamable HTTP
+      // },
+      
+      // weather: {
+      //   url: `http://localhost:${sseServerPort}/sse`,
+      //   transport: "sse"  // Force SSE
+      // },
+
+      // weather: {
+      //   url: `ws://localhost:${wsServerPort}/message`
+      // },
 
       // sqlite: {
       //   command: "uvx",
@@ -127,15 +142,26 @@ export async function test(): Promise<void> {
       model: "gpt-4o-mini"
       // model: "o4-mini"
     });
+    // const llm = new ChatGoogleGenerativeAI({
+    //   // https://ai.google.dev/gemini-api/docs/pricing
+    //   model: "gemini-2.0-flash"
+    //   // model: "gemini-2.5-pro-preview-06-05"
+    // });
 
     const agent = createReactAgent({
       llm,
       tools
     });
 
+    console.log("\x1b[32m");  // color to green
+    console.log("\nLLM model:", llm.constructor.name, llm.model);
+    console.log("\x1b[0m");  // reset the color
+
+    // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me the number of directories in the current directory";
+    // const query = "Tell me the number of directories in `.`";
     const query = "Tomorrow's weather in SF?";
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +

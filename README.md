@@ -1,12 +1,17 @@
 # MCP To LangChain Tools Conversion Utility / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools)
 
-## NOTE
+This is a simple, lightweight library intended to simplify the use of
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+server tools with LangChain.
+Its simplicity and extra features for stdio MCP servers can make it useful as a basis for your own customizations.
+However, it only supports text results of tool calls and does not support MCP features other than tools.
 
-LangChain's official **LangChain.js MCP Adapters** library has been released at:
+LangChain's **official LangChain.js MCP Adapters** library,
+which supports comprehensive integration with LangChain, has been released at:
 - npmjs: https://www.npmjs.com/package/@langchain/mcp-adapters
-- github: https://github.com/langchain-ai/langchainjs-mcp-adapters
+- github: https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-mcp-adapters`
 
-You may want to consider using the above if you don't have specific needs for using this library...
+You may want to consider using the above if you don't have specific needs for this library.
 
 ## Introduction
 
@@ -14,23 +19,17 @@ This package is intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools with LangChain / TypeScript.
 
-[Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
-an open standard
-[announced by Anthropic](https://www.anthropic.com/news/model-context-protocol),
-dramatically expands LLM's scope
-by enabling external tool and resource integration, including
-GitHub, Google Drive, Slack, Notion, Spotify, Docker, PostgreSQL, and more…
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is the de facto industry standard
+that dramatically expands the scope of LLMs by enabling the integration of external tools and resources,
+including DBs, GitHub, Google Drive, Docker, Slack, Notion, Spotify, and more.
 
-MCP is likely to become the de facto industry standard as 
-[OpenAI has announced its adoption](https://techcrunch.com/2025/03/26/openai-adopts-rival-anthropics-standard-for-connecting-ai-models-to-data).
-
-Over 2000 functional components available as MCP servers:
+There are quite a few useful MCP servers already available:
 
 - [MCP Server Listing on the Official Site](https://github.com/modelcontextprotocol/servers?tab=readme-ov-file#model-context-protocol-servers)
 - [MCP.so - Find Awesome MCP Servers and Clients](https://mcp.so/)
 - [Smithery: MCP Server Registry](https://smithery.ai/)
 
-The goal of this utility is to make these 2000+ MCP servers readily accessible from LangChain.
+This utility's goal is to make these massive numbers of MCP servers easily accessible from LangChain.
 
 It contains a utility function `convertMcpToLangchainTools()`.  
 This async function handles parallel initialization of specified multiple MCP servers
@@ -111,31 +110,132 @@ For detailed information on how to use this library, please refer to the followi
 
 ## Experimental Features
 
-### Remote MCP Server Support
+### `stderr` Redirection for Local MCP Server 
 
-`mcp_servers` configuration for SSE and Websocket servers are as follows:
+A new key `"stderr"` has been introduced to specify a file descriptor
+to which local (stdio) MCP server's stderr is redirected.  
+The key name `stderr` is derived from
+TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L32).
 
 ```ts
-    "sse-server-name": {
-        url: `http://${sse_server_host}:${sse_server_port}/...`
+    const logPath = `mcp-server-${serverName}.log`;
+    const logFd = fs.openSync(logPath, "w");
+    mcpServers[serverName].stderr = logFd;
+```
+
+A usage example can be found [here](
+https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd5274d95d3f6d14bed0937a6/src/index.ts#L72-L83)
+
+### Working Directory Configuration for Local MCP Servers
+
+The working directory that is used when spawning a local (stdio) MCP server
+can be specified with the `"cwd"` key as follows:
+
+```ts
+    "local-server-name": {
+      command: "...",
+      args: [...],
+      cwd: "/working/directory"  // the working dir to be use by the server
+    },
+```
+
+The key name `cwd` is derived from
+TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L39).
+
+
+### Remote MCP Server Support
+
+`mcp_servers` configuration for Streamable HTTP, SSE and Websocket servers are as follows:
+
+```ts
+    // Auto-detection: tries Streamable HTTP first, falls back to SSE on 4xx errors
+    "auto-detect-server": {
+        url: `http://${server_host}:${server_port}/...`
     },
 
+    // Explicit Streamable HTTP
+    "streamable-http-server": {
+        url: `http://${server_host}:${server_port}/...`,
+        transport: "streamable_http"
+    },
+
+    // Explicit SSE
+    "sse-server-name": {
+        url: `http://${sse_server_host}:${sse_server_port}/...`,
+        transport: "sse"
+    },
+
+    // WebSocket
     "ws-server-name": {
         url: `ws://${ws_server_host}:${ws_server_port}/...`
     },
 ```
 
-Note that the key `"url"` may be changed in the future to match
-the MCP server configurations used by Claude for Desktop once
-it introduces remote server support.
+**Auto-detection behavior (default):**
+- For HTTP/HTTPS URLs without explicit `transport`, the library follows [MCP specification recommendations](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility)
+- First attempts Streamable HTTP transport
+- If Streamable HTTP fails with a 4xx error, automatically falls back to SSE transport
+- Non-4xx errors (network issues, etc.) are re-thrown without fallback
 
-A usage example can be found [here](
-https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd5274d95d3f6d14bed0937a6/src/index.ts#L26-L38)
+**Explicit transport selection:**
+- Set `transport: "streamable_http"` to force Streamable HTTP (no fallback)
+- Set `transport: "sse"` to force SSE transport
+- WebSocket URLs (`ws://` or `wss://`) always use WebSocket transport
 
-### Authentication Support for SSE Connections
+Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE transport. According to the [official MCP documentation](https://modelcontextprotocol.io/docs/concepts/transports):
 
-The library now supports authentication for SSE connections to MCP servers.
-This is particularly useful for accessing authenticated MCP servers that require OAuth.
+> "SSE as a standalone transport is deprecated as of protocol version 2024-11-05. It has been replaced by Streamable HTTP, which incorporates SSE as an optional streaming mechanism."
+
+Note that even when you specify the Streamable HTTP transport, you may see SSE activity in the logs, such as `Accept: text/event-stream`.
+This occurs when the MCP SDK chooses to use SSE for streaming server responses within the Streamable HTTP transport.
+
+### Authentication Support for Streamable HTTP Connections
+
+The library supports authentication for Streamable HTTP connections (the modern, recommended transport):
+
+```ts
+import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+
+// Implement your own OAuth client provider
+class MyOAuthProvider implements OAuthClientProvider {
+  // Implementation details...
+}
+
+const mcpServers = {
+  "secure-streamable-server": {
+    url: "https://secure-mcp-server.example.com/mcp",
+    transport: "streamable_http",  // Optional: explicit transport
+    streamableHTTPOptions: {
+      // Provide an OAuth client provider
+      authProvider: new MyOAuthProvider(),
+      
+      // Optionally customize HTTP requests
+      requestInit: {
+        headers: {
+          'X-Custom-Header': 'custom-value'
+        }
+      },
+      
+      // Optionally configure reconnection behavior
+      reconnectionOptions: {
+        maxReconnectAttempts: 5,
+        reconnectDelay: 1000
+      }
+    }
+  }
+};
+```
+
+Test implementations are provided:
+
+- **Streamable HTTP Authentication Tests**:
+  - MCP client uses this library: [streamable-http-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-client.ts)
+  - Test MCP Server:  [streamable-http-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-server.ts)
+
+### Authentication Support for SSE Connections (Legacy)
+
+The library also supports authentication for SSE connections to MCP servers.
+Note that SSE transport is deprecated; Streamable HTTP is the recommended approach.
 
 To enable authentication, provide SSE options in your server configuration:
 
@@ -170,47 +270,11 @@ const mcpServers = {
 };
 ```
 
-A simple example showing how to implement an OAuth client provider can be found
-in [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts-usage/tree/main/src/sse-auth-test-client.ts)
-of [this usage examples repo](https://github.com/hideya/langchain-mcp-tools-ts-usage).
+Test implementations are provided:
 
-For testing purposes, a sample MCP server with OAuth authentication support
-that works with the above client is provided
-in [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts-usage/tree/main/src/sse-auth-test-server.ts)
-of [this usage examples repo](https://github.com/hideya/langchain-mcp-tools-ts-usage).
-
-### Working Directory Configuration for Local MCP Servers
-
-The working directory that is used when spawning a local (stdio) MCP server
-can be specified with the `"cwd"` key as follows:
-
-```ts
-    "local-server-name": {
-      command: "...",
-      args: [...],
-      cwd: "/working/directory"  // the working dir to be use by the server
-    },
-```
-
-The key name `cwd` is derived from
-TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L39).
-
-
-### `stderr` Redirection for Local MCP Server 
-
-A new key `"stderr"` has been introduced to specify a file descriptor
-to which local (stdio) MCP server's stderr is redirected.  
-The key name `stderr` is derived from
-TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L32).
-
-```ts
-    const logPath = `mcp-server-${serverName}.log`;
-    const logFd = fs.openSync(logPath, "w");
-    mcpServers[serverName].stderr = logFd;
-```
-
-A usage example can be found [here](
-https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd5274d95d3f6d14bed0937a6/src/index.ts#L72-L83)
+- **SSE Authentication Tests**:
+  - MCP client uses this library: [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-client.ts)
+  - Test MCP Server: [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-server.ts)
 
 ## Limitations
 
