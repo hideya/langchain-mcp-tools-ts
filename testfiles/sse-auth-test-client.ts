@@ -5,7 +5,32 @@ import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 process.env.MCP_DEBUG = "true";
 
 /**
- * Simple implementation of OAuthClientProvider for testing
+ * ⚠️ TEST IMPLEMENTATION ONLY - NOT OAUTH 2.1 COMPLIANT
+ *
+ * This is a simplified test implementation that does NOT comply with OAuth 2.1 requirements.
+ * It's designed solely for testing MCP authentication integration with SSE transport.
+ *
+ * IMPORTANT: SSE transport is deprecated as of MCP specification 2025-03-26.
+ * Use Streamable HTTP transport for new implementations.
+ *
+ * For production use, you MUST implement:
+ * - PKCE (Proof Key for Code Exchange) - REQUIRED in OAuth 2.1
+ * - Authorization Code Flow with proper user consent and authorization server
+ * - Authorization Server Metadata discovery (RFC8414)
+ * - Secure token storage, validation, and refresh
+ * - Dynamic Client Registration (RFC7591) - RECOMMENDED
+ *
+ * Consider using production-ready OAuth 2.1 libraries:
+ * - @auth0/auth0-spa-js
+ * - oidc-client-ts
+ * - passport-oauth2
+ * - node-oauth2-server
+ *
+ * This test implementation uses:
+ * - Hardcoded tokens (❌ Security risk)
+ * - No real authorization flow (❌ Missing OAuth core)
+ * - Mock PKCE values (❌ Not cryptographically secure)
+ * - No token validation (❌ Missing security)
  */
 class TestAuthProvider implements OAuthClientProvider {
   private _clientInfo = { client_id: "test_client_id" };

@@ -25,6 +25,7 @@ import { Logger } from "./logger.js";
  */
 export interface CommandBasedConfig {
   url?: never;
+  transport?: never;
   command: string;
   args?: string[];
   env?: Record<string, string>;

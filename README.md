@@ -109,7 +109,7 @@ try [this LangChain application built with the utility](https://github.com/hidey
 For detailed information on how to use this library, please refer to the following document:  
 ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
 
-## Experimental Features
+## Features
 
 ### `stderr` Redirection for Local MCP Server 
 
@@ -192,7 +192,7 @@ This occurs when the MCP SDK chooses to use SSE for streaming server responses w
 
 ### Authentication Support for Streamable HTTP Connections
 
-The library supports authentication for Streamable HTTP connections (the modern, recommended transport):
+The library supports OAuth 2.1 authentication for Streamable HTTP connections:
 
 ```ts
 import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
