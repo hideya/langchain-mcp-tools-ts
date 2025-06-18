@@ -60,7 +60,7 @@ export async function test(): Promise<void> {
         url: `http://localhost:${sseServerPort}/sse`
       },
       
-      // Example of explicit transport selection:
+      // // THIS DOESN'T WORK: Example of explicit transport selection:
       // weather: {
       //   url: `http://localhost:${sseServerPort}/sse`,
       //   transport: "streamable_http"  // Force Streamable HTTP

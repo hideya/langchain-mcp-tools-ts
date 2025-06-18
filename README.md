@@ -3,6 +3,7 @@
 This is a simple, lightweight library intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools with LangChain.
+
 Its simplicity and extra features for stdio MCP servers can make it useful as a basis for your own customizations.
 However, it only supports text results of tool calls and does not support MCP features other than tools.
 
