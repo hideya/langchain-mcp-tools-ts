@@ -116,8 +116,167 @@ The project follows a simple and focused architecture:
    To test the publishing process without actually publishing to npm:
 
    ```bash
-   npm run test-publish
+   npm run publish:test
    ```
+
+## Testing Network Features
+
+The project includes comprehensive test servers and clients for testing remote MCP server functionality. These tests help validate different transport protocols, authentication mechanisms, and connection patterns.
+
+### Available Test Scenarios
+
+The project provides test servers and clients for various network scenarios:
+
+#### 1. **Streamable HTTP Stateless (Modern, Simple)**
+
+Tests the modern Streamable HTTP transport without authentication or session management:
+
+```bash
+# Terminal 1: Start Streamable HTTP stateless test server
+npm run test:streamable:stateless:server
+
+# Terminal 2: Run Streamable HTTP stateless test client
+npm run test:streamable:stateless:client
+```
+
+**Features tested:**
+- Stateless Streamable HTTP transport
+- No authentication complexity
+- Per-request isolation
+- Concurrent connection scalability
+- Auto-detection transport selection
+- Simple deployment model
+
+#### 2. **Streamable HTTP with Authentication (Modern, Advanced)**
+
+Tests the modern Streamable HTTP transport with authentication and session management:
+
+```bash
+# Terminal 1: Start Streamable HTTP auth test server
+npm run test:streamable:auth:server
+
+# Terminal 2: Run Streamable HTTP auth test client
+npm run test:streamable:auth:client
+```
+
+**Features tested:**
+- Streamable HTTP transport protocol
+- Session-based authentication
+- POST/GET/DELETE HTTP methods
+- Session lifecycle management
+- Auto-detection vs explicit transport selection
+- Concurrent authenticated connections
+
+#### 3. **SSE Transport with Authentication (Legacy)**
+
+Tests the older SSE (Server-Sent Events) transport with OAuth authentication.
+Note: SSE transport is deprecated; use Streamable HTTP for new projects.
+
+```bash
+# Terminal 1: Start SSE auth test server
+npm run test:sse:server
+
+# Terminal 2: Run SSE auth test client
+npm run test:sse:client
+```
+
+**Features tested:**
+- SSE transport protocol (deprecated)
+- OAuth 2.0 authentication flow
+- Bearer token validation
+- Session management
+- Tool execution with authentication
+
+#### 4. **Transport Auto-Detection**
+
+Tests the automatic transport detection feature:
+
+```bash
+npm run test:streamable:auto-detection
+```
+
+**Features tested:**
+- Automatic Streamable HTTP detection
+- Fallback to SSE on 4xx errors
+- Transport selection logic
+- Error handling for unsupported transports
+
+### Test Server Architecture
+
+Each test server demonstrates different architectural patterns:
+
+**Stateless Server (Modern, Recommended):**
+- Creates new server + transport instances per request
+- No session management or persistent state
+- Only POST HTTP method needed
+- Perfect request isolation
+- Horizontally scalable architecture
+- Suitable for simple API wrappers and microservices
+
+**Stateful Server (Advanced Use Cases):**
+- Uses `Map` storage for session management
+- Implements Bearer token authentication
+- Handles POST/GET/DELETE HTTP methods
+- Maintains persistent transport instances
+- Suitable for complex, user-specific scenarios
+
+**SSE Server (Legacy, Deprecated):**
+- Uses persistent Server-Sent Events connections
+- Requires separate endpoints for different operations
+- Less flexible than Streamable HTTP
+- Maintained for backward compatibility only
+
+### What Each Test Validates
+
+#### **Connection Establishment**
+- Transport protocol negotiation
+- Authentication flow (where applicable)
+- Session initialization and management
+- Error handling for connection failures
+
+#### **Tool Execution**
+- MCP tool discovery (`tools/list`)
+- Tool invocation (`tools/call`)
+- Parameter validation
+- Result handling (text content)
+- Error propagation
+
+#### **Concurrent Operations**
+- Multiple simultaneous connections
+- Request isolation (especially important for stateless)
+- Performance under load
+- Resource cleanup
+
+#### **Transport Features**
+- HTTP method handling (POST, GET, DELETE)
+- SSE streaming (where applicable)
+- Auto-detection and fallback logic
+- CORS configuration
+- Request/response debugging
+
+### Debugging Network Issues
+
+The test clients include comprehensive debugging features:
+
+**HTTP Request/Response Logging:**
+```bash
+# Enable maximum debug output
+process.env.MCP_DEBUG = "true";
+```
+
+**Server-side Debug Logging:**
+All test servers include detailed debug output showing:
+- Request headers and body previews
+- Transport creation and cleanup
+- Authentication validation
+- Session management events
+
+**Client-side Debug Logging:**
+Test clients log:
+- HTTP requests and responses
+- Tool invocation details
+- Connection lifecycle events
+- Error details with troubleshooting tips
 
 ---
 

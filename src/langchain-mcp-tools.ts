@@ -3,6 +3,10 @@ import { Stream } from "node:stream";
 import { DynamicStructuredTool, StructuredTool } from "@langchain/core/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport, SSEClientTransportOptions } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport,
+    StreamableHTTPClientTransportOptions,
+    StreamableHTTPReconnectionOptions
+  } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -36,6 +40,7 @@ export interface CommandBasedConfig {
  */
 export interface UrlBasedConfig {
   url: string;
+  transport?: string;
   command?: never;
   args?: never;
   env?: never;
@@ -49,6 +54,12 @@ export interface UrlBasedConfig {
     eventSourceInit?: EventSourceInit;
     // Customizes recurring POST requests to the server
     requestInit?: RequestInit;
+  };
+  streamableHTTPOptions?: {
+    authProvider?: OAuthClientProvider;
+    requestInit?: RequestInit;
+    reconnectionOptions?: StreamableHTTPReconnectionOptions;
+    sessionId?: string;
   };
 }
 
@@ -202,6 +213,289 @@ export async function convertMcpToLangchainTools(
 }
 
 /**
+ * Sanitizes a JSON Schema to make it compatible with Google Gemini API.
+ * 
+ * ⚠️  IMPORTANT: This is a temporary workaround to keep applications running.
+ *     The underlying schema compatibility issues should be fixed on the MCP server side
+ *     for proper Google LLM compatibility. This function will log warnings when
+ *     performing schema conversions to help track which servers need upstream fixes.
+ * 
+ * Gemini supports only a limited subset of OpenAPI 3.0 Schema properties:
+ * - string: enum, format (only 'date-time' documented)  
+ * - integer/number: format only
+ * - array: minItems, maxItems, items
+ * - object: properties, required, propertyOrdering, nullable
+ * 
+ * This function removes known problematic properties while preserving
+ * as much validation as possible. When debug logging is enabled,
+ * it reports what schema changes were made for transparency.
+ * 
+ * Reference: https://ai.google.dev/gemini-api/docs/structured-output#json-schemas
+ *
+ * @param schema - The JSON schema to sanitize
+ * @param logger - Optional logger for reporting sanitization actions
+ * @param toolName - Optional tool name for logging context
+ * @returns A sanitized schema compatible with all major LLM providers
+ * 
+ * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
+ */
+function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?: string): any {
+  if (typeof schema !== 'object' || schema === null) {
+    return schema;
+  }
+  
+  const sanitized = { ...schema };
+  const removedProperties: string[] = [];
+  const convertedProperties: string[] = [];
+  
+  // Remove unsupported properties
+  if (sanitized.exclusiveMinimum !== undefined) {
+    removedProperties.push('exclusiveMinimum');
+    delete sanitized.exclusiveMinimum;
+  }
+  if (sanitized.exclusiveMaximum !== undefined) {
+    removedProperties.push('exclusiveMaximum');
+    delete sanitized.exclusiveMaximum;
+  }
+  
+  // Convert exclusiveMinimum/Maximum to minimum/maximum if needed
+  if (schema.exclusiveMinimum !== undefined) {
+    sanitized.minimum = schema.exclusiveMinimum;
+    convertedProperties.push('exclusiveMinimum → minimum');
+  }
+  if (schema.exclusiveMaximum !== undefined) {
+    sanitized.maximum = schema.exclusiveMaximum;
+    convertedProperties.push('exclusiveMaximum → maximum');
+  }
+  
+  // Remove unsupported string formats (Gemini only supports 'enum' and 'date-time')
+  if (sanitized.type === 'string' && sanitized.format) {
+    const supportedFormats = ['enum', 'date-time'];
+    if (!supportedFormats.includes(sanitized.format)) {
+      removedProperties.push(`format: ${sanitized.format}`);
+      delete sanitized.format;
+    }
+  }
+  
+  // Log sanitization actions for this level
+  if (logger && toolName && (removedProperties.length > 0 || convertedProperties.length > 0)) {
+    const changes = [];
+    if (removedProperties.length > 0) {
+      changes.push(`removed: ${removedProperties.join(', ')}`);
+    }
+    if (convertedProperties.length > 0) {
+      changes.push(`converted: ${convertedProperties.join(', ')}`);
+    }
+    logger.warn(`MCP tool "${toolName}": schema sanitized for Gemini compatibility (${changes.join('; ')})`);
+  }
+  
+  // Recursively process nested objects and arrays
+  if (sanitized.properties) {
+    sanitized.properties = Object.fromEntries(
+      Object.entries(sanitized.properties).map(([key, value]) => [
+        key,
+        sanitizeSchemaForGemini(value, logger, toolName)
+      ])
+    );
+  }
+  
+  if (sanitized.anyOf) {
+    sanitized.anyOf = sanitized.anyOf.map((subSchema: any) => sanitizeSchemaForGemini(subSchema, logger, toolName));
+  }
+  
+  if (sanitized.oneOf) {
+    sanitized.oneOf = sanitized.oneOf.map((subSchema: any) => sanitizeSchemaForGemini(subSchema, logger, toolName));
+  }
+  
+  if (sanitized.allOf) {
+    sanitized.allOf = sanitized.allOf.map((subSchema: any) => sanitizeSchemaForGemini(subSchema, logger, toolName));
+  }
+  
+  if (sanitized.items) {
+    sanitized.items = sanitizeSchemaForGemini(sanitized.items, logger, toolName);
+  }
+  
+  if (sanitized.additionalProperties && typeof sanitized.additionalProperties === 'object') {
+    sanitized.additionalProperties = sanitizeSchemaForGemini(sanitized.additionalProperties, logger, toolName);
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Creates Streamable HTTP transport options from configuration.
+ * Consolidates repeated option configuration logic into a single reusable function.
+ *
+ * @param config - URL-based server configuration
+ * @param logger - Logger instance for recording authentication setup
+ * @param serverName - Server name for logging context
+ * @returns Configured StreamableHTTPClientTransportOptions or undefined if no options needed
+ * 
+ * @internal This function is meant to be used internally by transport creation functions
+ */
+function createStreamableHttpOptions(
+  config: UrlBasedConfig,
+  logger: McpToolsLogger,
+  serverName: string
+): StreamableHTTPClientTransportOptions | undefined {
+  const options: StreamableHTTPClientTransportOptions = {};
+  
+  if (config.streamableHTTPOptions) {
+    if (config.streamableHTTPOptions.authProvider) {
+      options.authProvider = config.streamableHTTPOptions.authProvider;
+      logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
+    }
+    
+    if (config.streamableHTTPOptions.requestInit) {
+      options.requestInit = config.streamableHTTPOptions.requestInit;
+    }
+    
+    if (config.streamableHTTPOptions.reconnectionOptions) {
+      options.reconnectionOptions = config.streamableHTTPOptions.reconnectionOptions;
+    }
+
+    if (config.streamableHTTPOptions.sessionId) {
+      options.sessionId = config.streamableHTTPOptions.sessionId;
+    }
+  }
+  
+  return Object.keys(options).length > 0 ? options : undefined;
+}
+
+/**
+ * Creates SSE transport options from configuration.
+ * Consolidates repeated option configuration logic into a single reusable function.
+ *
+ * @param config - URL-based server configuration
+ * @param logger - Logger instance for recording authentication setup
+ * @param serverName - Server name for logging context
+ * @returns Configured SSEClientTransportOptions or undefined if no options needed
+ * 
+ * @internal This function is meant to be used internally by transport creation functions
+ */
+function createSseOptions(
+  config: UrlBasedConfig,
+  logger: McpToolsLogger,
+  serverName: string
+): SSEClientTransportOptions | undefined {
+  const options: SSEClientTransportOptions = {};
+  
+  if (config.sseOptions) {
+    if (config.sseOptions.authProvider) {
+      options.authProvider = config.sseOptions.authProvider;
+      logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
+    }
+    
+    if (config.sseOptions.eventSourceInit) {
+      options.eventSourceInit = config.sseOptions.eventSourceInit;
+    }
+    
+    if (config.sseOptions.requestInit) {
+      options.requestInit = config.sseOptions.requestInit;
+    }
+  }
+  
+  return Object.keys(options).length > 0 ? options : undefined;
+}
+
+/**
+ * Determines if an error represents a 4xx HTTP status code.
+ * Used to decide whether to fall back from Streamable HTTP to SSE transport.
+ *
+ * @param error - The error to check
+ * @returns true if the error represents a 4xx HTTP status
+ * 
+ * @internal This function is meant to be used internally by createHttpTransportWithFallback
+ */
+function is4xxError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  
+  // Check for common error patterns that indicate 4xx responses
+  const errorObj = error as any;
+  
+  // Check if it's a fetch Response error with status
+  if (errorObj.status && typeof errorObj.status === 'number') {
+    return errorObj.status >= 400 && errorObj.status < 500;
+  }
+  
+  // Check if it's wrapped in a Response object
+  if (errorObj.response && errorObj.response.status && typeof errorObj.response.status === 'number') {
+    return errorObj.response.status >= 400 && errorObj.response.status < 500;
+  }
+  
+  // Check for error messages that typically indicate 4xx errors
+  const message = errorObj.message || errorObj.toString();
+  if (typeof message === 'string') {
+    return /4[0-9]{2}/.test(message) || 
+           message.includes('Bad Request') ||
+           message.includes('Unauthorized') ||
+           message.includes('Forbidden') ||
+           message.includes('Not Found') ||
+           message.includes('Method Not Allowed');
+  }
+  
+  return false;
+}
+
+/**
+ * Creates an HTTP transport with automatic fallback from Streamable HTTP to SSE.
+ * Follows the MCP specification recommendation to try Streamable HTTP first,
+ * then fall back to SSE if a 4xx error is encountered.
+ *
+ * See: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility
+ *
+ * @param url - The URL to connect to
+ * @param config - URL-based server configuration
+ * @param logger - Logger instance for recording connection attempts
+ * @param serverName - Server name for logging context
+ * @returns A promise that resolves to a configured Transport
+ * 
+ * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
+ */
+async function createHttpTransportWithFallback(
+  url: URL,
+  config: UrlBasedConfig,
+  logger: McpToolsLogger,
+  serverName: string
+): Promise<Transport> {
+  // If transport is explicitly specified, respect user's choice
+  if (config.transport === "streamable_http") {
+    logger.debug(`MCP server "${serverName}": using explicitly configured Streamable HTTP transport`);
+    const options = createStreamableHttpOptions(config, logger, serverName);
+    return new StreamableHTTPClientTransport(url, options);
+  }
+  
+  if (config.transport === "sse") {
+    logger.debug(`MCP server "${serverName}": using explicitly configured SSE transport`);
+    const options = createSseOptions(config, logger, serverName);
+    return new SSEClientTransport(url, options);
+  }
+  
+  // Auto-detection: try Streamable HTTP first, fall back to SSE on 4xx errors
+  logger.debug(`MCP server "${serverName}": attempting Streamable HTTP transport with SSE fallback`);
+  
+  try {
+    const options = createStreamableHttpOptions(config, logger, serverName);
+    const transport = new StreamableHTTPClientTransport(url, options);
+    logger.info(`MCP server "${serverName}": successfully created Streamable HTTP transport`);
+    return transport;
+    
+  } catch (error) {
+    if (is4xxError(error)) {
+      logger.info(`MCP server "${serverName}": Streamable HTTP failed with 4xx error, falling back to SSE transport`);
+      const options = createSseOptions(config, logger, serverName);
+      return new SSEClientTransport(url, options);
+    }
+    
+    // Re-throw non-4xx errors (network issues, etc.)
+    logger.error(`MCP server "${serverName}": Streamable HTTP transport creation failed with non-4xx error:`, error);
+    throw error;
+  }
+}
+
+/**
  * Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
  *
  * OpenAI's Structured Outputs feature requires that all optional fields must also be nullable.
@@ -218,6 +512,8 @@ export async function convertMcpToLangchainTools(
  * // Output schema: z.object({ name: z.string(), age: z.number().optional().nullable() })
  *
  * @see {@link https://platform.openai.com/docs/guides/structured-outputs | OpenAI Structured Outputs Documentation}
+ * 
+ * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
  */
 function makeZodSchemaOpenAICompatible(schema: z.ZodObject<any>): z.ZodObject<any> {
   const shape = schema.shape;
@@ -279,26 +575,80 @@ async function convertSingleMcpToLangchainTools(
     }
   
     if (url?.protocol === "http:" || url?.protocol === "https:") {
-      // Extract SSE options from config if available
+      // Use the new auto-detection logic with fallback
       const urlConfig = config as UrlBasedConfig;
-      const sseOptions: SSEClientTransportOptions = {};
       
-      if (urlConfig.sseOptions) {
-        if (urlConfig.sseOptions.authProvider) {
-          sseOptions.authProvider = urlConfig.sseOptions.authProvider;
-          logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
-        }
+      // Try to connect with Streamable HTTP first, fallback to SSE on 4xx errors
+      let connectionSucceeded = false;
+      
+      // If transport is explicitly specified, respect user's choice (no fallback)
+      if (urlConfig.transport === "streamable_http" || urlConfig.transport === "sse") {
+        transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
+      } else {
+        // Auto-detection with connection-level fallback
+        logger.debug(`MCP server "${serverName}": attempting Streamable HTTP transport with SSE fallback`);
         
-        if (urlConfig.sseOptions.eventSourceInit) {
-          sseOptions.eventSourceInit = urlConfig.sseOptions.eventSourceInit;
-        }
-        
-        if (urlConfig.sseOptions.requestInit) {
-          sseOptions.requestInit = urlConfig.sseOptions.requestInit;
+        try {
+          // First attempt: Streamable HTTP
+          const options = createStreamableHttpOptions(urlConfig, logger, serverName);
+          transport = new StreamableHTTPClientTransport(url, options);
+          logger.info(`MCP server "${serverName}": created Streamable HTTP transport, attempting connection`);
+          
+          // Try to connect with Streamable HTTP
+          client = new Client(
+            {
+              name: "mcp-client",
+              version: "0.0.1",
+            },
+            {
+              capabilities: {},
+            }
+          );
+          
+          await client.connect(transport);
+          connectionSucceeded = true;
+          logger.info(`MCP server "${serverName}": successfully connected using Streamable HTTP`);
+          
+        } catch (error) {
+          if (is4xxError(error)) {
+            logger.info(`MCP server "${serverName}": Streamable HTTP failed with 4xx error, falling back to SSE transport`);
+            
+            // Cleanup failed transport and client
+            if (transport) {
+              try {
+                await transport.close();
+              } catch (cleanupError) {
+                logger.debug(`MCP server "${serverName}": cleanup error during fallback:`, cleanupError);
+              }
+            }
+            
+            // Fallback to SSE
+            const options = createSseOptions(urlConfig, logger, serverName);
+            transport = new SSEClientTransport(url, options);
+            logger.info(`MCP server "${serverName}": created SSE transport, attempting fallback connection`);
+            
+            // Create new client for SSE connection
+            client = new Client(
+              {
+                name: "mcp-client",
+                version: "0.0.1",
+              },
+              {
+                capabilities: {},
+              }
+            );
+            
+            await client.connect(transport);
+            connectionSucceeded = true;
+            logger.info(`MCP server "${serverName}": successfully connected using SSE fallback`);
+            
+          } else {
+            // Re-throw non-4xx errors (network issues, etc.)
+            logger.error(`MCP server "${serverName}": Streamable HTTP transport failed with non-4xx error:`, error);
+            throw error;
+          }
         }
       }
-      
-      transport = new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
 
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
       transport = new WebSocketClientTransport(url);
@@ -322,31 +672,40 @@ async function convertSingleMcpToLangchainTools(
       });
     }
 
-    client = new Client(
-      {
-        name: "mcp-client",
-        version: "0.0.1",
-      },
-      {
-        capabilities: {},
-      }
-    );
+    // Only create client if not already created during auto-detection fallback
+    if (!client) {
+      client = new Client(
+        {
+          name: "mcp-client",
+          version: "0.0.1",
+        },
+        {
+          capabilities: {},
+        }
+      );
 
-    await client.connect(transport);
-    logger.info(`MCP server "${serverName}": connected`);
+      await client.connect(transport);
+      logger.info(`MCP server "${serverName}": connected`);
+    }
 
     const toolsResponse = await client.request(
       { method: "tools/list" },
       ListToolsResultSchema
     );
 
-    const tools = toolsResponse.tools.map((tool) => (
-      new DynamicStructuredTool({
+    const tools = toolsResponse.tools.map((tool) => {
+      // Apply sanitization for all LLMs (harmless for non-Gemini providers)
+      const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
+      const baseSchema = jsonSchemaToZod(sanitizedSchema as JsonSchema) as z.ZodObject<any>;
+      // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
+      const compatibleSchema = makeZodSchemaOpenAICompatible(baseSchema);
+      
+      return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
         // FIXME
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        schema: makeZodSchemaOpenAICompatible(jsonSchemaToZod(tool.inputSchema as JsonSchema)) as z.ZodObject<any>,
+        schema: compatibleSchema,
 
         func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
@@ -391,8 +750,8 @@ async function convertSingleMcpToLangchainTools(
               return `Error executing MCP tool: ${error}`;
           }
         },
-      })
-    ));
+      });
+    });
 
     logger.info(`MCP server "${serverName}": ${tools.length} tool(s) available:`);
     tools.forEach((tool) => logger.info(`- ${tool.name}`));
