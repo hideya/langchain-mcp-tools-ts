@@ -70,6 +70,7 @@ export async function test(): Promise<void> {
       //   url: `http://localhost:${sseServerPort}/sse`,
       //   transport: "sse"  // Force SSE
       // },
+
       // weather: {
       //   url: `ws://localhost:${wsServerPort}/message`
       // },
@@ -136,16 +137,16 @@ export async function test(): Promise<void> {
     //   model: "claude-3-5-haiku-latest"
     //   // model: "claude-sonnet-4-0"
     // });
-    // const llm = new ChatOpenAI({
-    //   // https://platform.openai.com/docs/pricing
-    //   model: "gpt-4o-mini"
-    //   // model: "o4-mini"
-    // });
-    const llm = new ChatGoogleGenerativeAI({
-      // https://ai.google.dev/gemini-api/docs/pricing
-      model: "gemini-2.0-flash"
-      // model: "gemini-2.5-pro-preview-06-05"
+    const llm = new ChatOpenAI({
+      // https://platform.openai.com/docs/pricing
+      model: "gpt-4o-mini"
+      // model: "o4-mini"
     });
+    // const llm = new ChatGoogleGenerativeAI({
+    //   // https://ai.google.dev/gemini-api/docs/pricing
+    //   model: "gemini-2.0-flash"
+    //   // model: "gemini-2.5-pro-preview-06-05"
+    // });
 
     const agent = createReactAgent({
       llm,

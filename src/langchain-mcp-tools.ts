@@ -323,6 +323,82 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
 }
 
 /**
+ * Creates Streamable HTTP transport options from configuration.
+ * Consolidates repeated option configuration logic into a single reusable function.
+ *
+ * @param config - URL-based server configuration
+ * @param logger - Logger instance for recording authentication setup
+ * @param serverName - Server name for logging context
+ * @returns Configured StreamableHTTPClientTransportOptions or undefined if no options needed
+ * 
+ * @internal This function is meant to be used internally by transport creation functions
+ */
+function createStreamableHttpOptions(
+  config: UrlBasedConfig,
+  logger: McpToolsLogger,
+  serverName: string
+): StreamableHTTPClientTransportOptions | undefined {
+  const options: StreamableHTTPClientTransportOptions = {};
+  
+  if (config.streamableHTTPOptions) {
+    if (config.streamableHTTPOptions.authProvider) {
+      options.authProvider = config.streamableHTTPOptions.authProvider;
+      logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
+    }
+    
+    if (config.streamableHTTPOptions.requestInit) {
+      options.requestInit = config.streamableHTTPOptions.requestInit;
+    }
+    
+    if (config.streamableHTTPOptions.reconnectionOptions) {
+      options.reconnectionOptions = config.streamableHTTPOptions.reconnectionOptions;
+    }
+
+    if (config.streamableHTTPOptions.sessionId) {
+      options.sessionId = config.streamableHTTPOptions.sessionId;
+    }
+  }
+  
+  return Object.keys(options).length > 0 ? options : undefined;
+}
+
+/**
+ * Creates SSE transport options from configuration.
+ * Consolidates repeated option configuration logic into a single reusable function.
+ *
+ * @param config - URL-based server configuration
+ * @param logger - Logger instance for recording authentication setup
+ * @param serverName - Server name for logging context
+ * @returns Configured SSEClientTransportOptions or undefined if no options needed
+ * 
+ * @internal This function is meant to be used internally by transport creation functions
+ */
+function createSseOptions(
+  config: UrlBasedConfig,
+  logger: McpToolsLogger,
+  serverName: string
+): SSEClientTransportOptions | undefined {
+  const options: SSEClientTransportOptions = {};
+  
+  if (config.sseOptions) {
+    if (config.sseOptions.authProvider) {
+      options.authProvider = config.sseOptions.authProvider;
+      logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
+    }
+    
+    if (config.sseOptions.eventSourceInit) {
+      options.eventSourceInit = config.sseOptions.eventSourceInit;
+    }
+    
+    if (config.sseOptions.requestInit) {
+      options.requestInit = config.sseOptions.requestInit;
+    }
+  }
+  
+  return Object.keys(options).length > 0 ? options : undefined;
+}
+
+/**
  * Determines if an error represents a 4xx HTTP status code.
  * Used to decide whether to fall back from Streamable HTTP to SSE transport.
  *
@@ -387,103 +463,30 @@ async function createHttpTransportWithFallback(
   // If transport is explicitly specified, respect user's choice
   if (config.transport === "streamable_http") {
     logger.debug(`MCP server "${serverName}": using explicitly configured Streamable HTTP transport`);
-    const options: StreamableHTTPClientTransportOptions = {};
-    
-    if (config.streamableHTTPOptions) {
-      if (config.streamableHTTPOptions.authProvider) {
-        options.authProvider = config.streamableHTTPOptions.authProvider;
-        logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
-      }
-      
-      if (config.streamableHTTPOptions.requestInit) {
-        options.requestInit = config.streamableHTTPOptions.requestInit;
-      }
-      
-      if (config.streamableHTTPOptions.reconnectionOptions) {
-        options.reconnectionOptions = config.streamableHTTPOptions.reconnectionOptions;
-      }
-
-      if (config.streamableHTTPOptions.sessionId) {
-        options.sessionId = config.streamableHTTPOptions.sessionId;
-      }
-    }
-    
-    return new StreamableHTTPClientTransport(url, Object.keys(options).length > 0 ? options : undefined);
+    const options = createStreamableHttpOptions(config, logger, serverName);
+    return new StreamableHTTPClientTransport(url, options);
   }
   
   if (config.transport === "sse") {
     logger.debug(`MCP server "${serverName}": using explicitly configured SSE transport`);
-    const sseOptions: SSEClientTransportOptions = {};
-    
-    if (config.sseOptions) {
-      if (config.sseOptions.authProvider) {
-        sseOptions.authProvider = config.sseOptions.authProvider;
-        logger.info(`MCP server "${serverName}": configuring SSE with authentication provider`);
-      }
-      
-      if (config.sseOptions.eventSourceInit) {
-        sseOptions.eventSourceInit = config.sseOptions.eventSourceInit;
-      }
-      
-      if (config.sseOptions.requestInit) {
-        sseOptions.requestInit = config.sseOptions.requestInit;
-      }
-    }
-    
-    return new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
+    const options = createSseOptions(config, logger, serverName);
+    return new SSEClientTransport(url, options);
   }
   
   // Auto-detection: try Streamable HTTP first, fall back to SSE on 4xx errors
   logger.debug(`MCP server "${serverName}": attempting Streamable HTTP transport with SSE fallback`);
   
   try {
-    const streamableOptions: StreamableHTTPClientTransportOptions = {};
-    
-    if (config.streamableHTTPOptions) {
-      if (config.streamableHTTPOptions.authProvider) {
-        streamableOptions.authProvider = config.streamableHTTPOptions.authProvider;
-        logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
-      }
-      
-      if (config.streamableHTTPOptions.requestInit) {
-        streamableOptions.requestInit = config.streamableHTTPOptions.requestInit;
-      }
-      
-      if (config.streamableHTTPOptions.reconnectionOptions) {
-        streamableOptions.reconnectionOptions = config.streamableHTTPOptions.reconnectionOptions;
-      }
-
-      if (config.streamableHTTPOptions.sessionId) {
-        streamableOptions.sessionId = config.streamableHTTPOptions.sessionId;
-      }
-    }
-    
-    const transport = new StreamableHTTPClientTransport(url, Object.keys(streamableOptions).length > 0 ? streamableOptions : undefined);
+    const options = createStreamableHttpOptions(config, logger, serverName);
+    const transport = new StreamableHTTPClientTransport(url, options);
     logger.info(`MCP server "${serverName}": successfully created Streamable HTTP transport`);
     return transport;
     
   } catch (error) {
     if (is4xxError(error)) {
       logger.info(`MCP server "${serverName}": Streamable HTTP failed with 4xx error, falling back to SSE transport`);
-      
-      const sseOptions: SSEClientTransportOptions = {};
-      
-      if (config.sseOptions) {
-        if (config.sseOptions.authProvider) {
-          sseOptions.authProvider = config.sseOptions.authProvider;
-          logger.info(`MCP server "${serverName}": configuring SSE fallback with authentication provider`);
-        }
-        
-        if (config.sseOptions.eventSourceInit) {
-          sseOptions.eventSourceInit = config.sseOptions.eventSourceInit;
-        }
-        
-        if (config.sseOptions.requestInit) {
-          sseOptions.requestInit = config.sseOptions.requestInit;
-        }
-      }
-      
-      return new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
+      const options = createSseOptions(config, logger, serverName);
+      return new SSEClientTransport(url, options);
     }
     
     // Re-throw non-4xx errors (network issues, etc.)
@@ -587,28 +590,8 @@ async function convertSingleMcpToLangchainTools(
         
         try {
           // First attempt: Streamable HTTP
-          const streamableOptions: StreamableHTTPClientTransportOptions = {};
-          
-          if (urlConfig.streamableHTTPOptions) {
-            if (urlConfig.streamableHTTPOptions.authProvider) {
-              streamableOptions.authProvider = urlConfig.streamableHTTPOptions.authProvider;
-              logger.info(`MCP server "${serverName}": configuring Streamable HTTP with authentication provider`);
-            }
-            
-            if (urlConfig.streamableHTTPOptions.requestInit) {
-              streamableOptions.requestInit = urlConfig.streamableHTTPOptions.requestInit;
-            }
-            
-            if (urlConfig.streamableHTTPOptions.reconnectionOptions) {
-              streamableOptions.reconnectionOptions = urlConfig.streamableHTTPOptions.reconnectionOptions;
-            }
-
-            if (urlConfig.streamableHTTPOptions.sessionId) {
-              streamableOptions.sessionId = urlConfig.streamableHTTPOptions.sessionId;
-            }
-          }
-          
-          transport = new StreamableHTTPClientTransport(url, Object.keys(streamableOptions).length > 0 ? streamableOptions : undefined);
+          const options = createStreamableHttpOptions(urlConfig, logger, serverName);
+          transport = new StreamableHTTPClientTransport(url, options);
           logger.info(`MCP server "${serverName}": created Streamable HTTP transport, attempting connection`);
           
           // Try to connect with Streamable HTTP
@@ -640,24 +623,8 @@ async function convertSingleMcpToLangchainTools(
             }
             
             // Fallback to SSE
-            const sseOptions: SSEClientTransportOptions = {};
-            
-            if (urlConfig.sseOptions) {
-              if (urlConfig.sseOptions.authProvider) {
-                sseOptions.authProvider = urlConfig.sseOptions.authProvider;
-                logger.info(`MCP server "${serverName}": configuring SSE fallback with authentication provider`);
-              }
-              
-              if (urlConfig.sseOptions.eventSourceInit) {
-                sseOptions.eventSourceInit = urlConfig.sseOptions.eventSourceInit;
-              }
-              
-              if (urlConfig.sseOptions.requestInit) {
-                sseOptions.requestInit = urlConfig.sseOptions.requestInit;
-              }
-            }
-            
-            transport = new SSEClientTransport(url, Object.keys(sseOptions).length > 0 ? sseOptions : undefined);
+            const options = createSseOptions(urlConfig, logger, serverName);
+            transport = new SSEClientTransport(url, options);
             logger.info(`MCP server "${serverName}": created SSE transport, attempting fallback connection`);
             
             // Create new client for SSE connection

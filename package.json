@@ -44,7 +44,6 @@
     
     "_comment_examples": "# Basic usage examples",
     "example:simple": "tsx testfiles/simple-usage.ts",
-    "example:direct": "tsx -- testfiles/direct-test.ts",
     
     "_comment_sse": "# SSE transport tests (with authentication)",
     "test:sse:server": "tsx testfiles/sse-auth-test-server.ts",

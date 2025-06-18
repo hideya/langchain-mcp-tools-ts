@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Issue #33: Streamable HTTP support
+
 ### Fixed
 - Issue #34: Compatibility issue with OpenAI's Structured Outputs requirements
+- Issue #36: JSON Schema Compatibility Issues with Google Gemini Models
 
 ## [0.2.4] - 2025-04-24
 
