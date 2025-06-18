@@ -21,12 +21,11 @@ export async function test(): Promise<void> {
 
   // If you are interested in testing the SSE/WS server setup, uncomment
   // one of the following code snippets and one of the appropriate "weather"
-  // server configurations, while commenting out the one for the stdio server
+  // server configurations, while commenting out the others.
   //
   const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
     "SSE",  "npx -y @h1deya/mcp-server-weather");
   //
-  global.WebSocket = WebSocket as any;
   const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
     "WS",  "npx -y @h1deya/mcp-server-weather");
 
@@ -47,6 +46,7 @@ export async function test(): Promise<void> {
           "mcp-server-fetch"
         ]
       },
+
       // weather: {
       //   command: "npx",
       //   args: [
@@ -137,11 +137,13 @@ export async function test(): Promise<void> {
     //   model: "claude-3-5-haiku-latest"
     //   // model: "claude-sonnet-4-0"
     // });
+
     const llm = new ChatOpenAI({
       // https://platform.openai.com/docs/pricing
       model: "gpt-4o-mini"
       // model: "o4-mini"
     });
+
     // const llm = new ChatGoogleGenerativeAI({
     //   // https://ai.google.dev/gemini-api/docs/pricing
     //   model: "gemini-2.0-flash"

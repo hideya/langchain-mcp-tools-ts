@@ -4,6 +4,33 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
+/**
+ * ⚠️ TEST SERVER - NOT OAUTH 2.1 COMPLIANT
+ * 
+ * This test server implements a simplified authentication mechanism that does NOT
+ * comply with OAuth 2.1 requirements. It's designed solely for testing MCP 
+ * authentication integration with Streamable HTTP transport.
+ *
+ * This server demonstrates:
+ * - Basic Bearer token authentication
+ * - Session management for Streamable HTTP
+ * - MCP tool integration with authentication
+ *
+ * For production use, implement a proper OAuth 2.1 server with:
+ * - PKCE (Proof Key for Code Exchange) - REQUIRED in OAuth 2.1
+ * - Authorization endpoint with user consent flow
+ * - Token endpoint with proper code exchange
+ * - Authorization Server Metadata (/.well-known/oauth-authorization-server)
+ * - Secure token generation, validation, and refresh
+ * - Dynamic Client Registration (RFC7591) - RECOMMENDED
+ *
+ * Consider using production-ready OAuth 2.1 libraries:
+ * - @auth0/auth0-spa-js (client) + Auth0 (server)
+ * - oidc-client-ts (client) + IdentityServer, Keycloak (server)
+ * - passport-oauth2 + node-oauth2-server
+ * - express-oauth-server
+ */
+
 const app = express();
 const PORT = 3334;
 const HOST = "0.0.0.0";
