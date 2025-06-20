@@ -50,14 +50,6 @@ export async function test(): Promise<void> {
         ]
       },
 
-      // github: {
-      //   type: "http",
-      //   url: "https://api.githubcopilot.com/mcp/",
-      //   headers: {
-      //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
-      //   }
-      // },
-
       // weather: {
       //   command: "npx",
       //   args: [
@@ -85,6 +77,14 @@ export async function test(): Promise<void> {
 
       // weather: {
       //   url: `ws://localhost:${wsServerPort}/message`
+      // },
+
+       // github: {
+      //   type: "http",
+      //   url: "https://api.githubcopilot.com/mcp/",
+      //   headers: {
+      //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
+      //   }
       // },
 
       // sqlite: {
