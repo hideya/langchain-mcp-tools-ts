@@ -27,6 +27,7 @@ export interface CommandBasedConfig {
   url?: never;
   transport?: string;
   type?: string;
+  headers?: never;
   command: string;
   args?: string[];
   env?: Record<string, string>;

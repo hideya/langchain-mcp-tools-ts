@@ -158,7 +158,7 @@ TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotoc
     "streamable-http-server": {
         url: `http://${server_host}:${server_port}/...`,
         transport: "streamable_http"
-        // type: "http"  // VSCode-style config works too
+        // type: "http"  // VSCode-style config also works instead of the above
     },
 
     // Explicit SSE
@@ -197,6 +197,7 @@ alone is not enough; your GitHub account must have an active Copilot subscriptio
 
 **Explicit transport selection:**
 - Set `transport: "streamable_http"` to force Streamable HTTP (no fallback)
+- VSCode-style config `type: "http"` also works instead of the above
 - Set `transport: "sse"` to force SSE transport
 - WebSocket URLs (`ws://` or `wss://`) always use WebSocket transport
 

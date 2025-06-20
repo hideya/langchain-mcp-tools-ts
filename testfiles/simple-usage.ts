@@ -79,7 +79,9 @@ export async function test(): Promise<void> {
       //   url: `ws://localhost:${wsServerPort}/message`
       // },
 
-       // github: {
+      // // Example of authentication via Authorization header
+      // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
+      // github: {
       //   type: "http",
       //   url: "https://api.githubcopilot.com/mcp/",
       //   headers: {
