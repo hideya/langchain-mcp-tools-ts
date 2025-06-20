@@ -32,6 +32,8 @@ export async function test(): Promise<void> {
   try {
     const mcpServers: McpServersConfig = {
       filesystem: {
+        // transport: "stdio",  // optional
+        // type: "stdio",  // optional: VSCode-style config works too
         command: "npx",
         args: [
           "-y",
@@ -40,12 +42,21 @@ export async function test(): Promise<void> {
         ],
         cwd: "/tmp"  // the working directory to be use by the server
       },
+
       fetch: {
         command: "uvx",
         args: [
           "mcp-server-fetch"
         ]
       },
+
+      // github: {
+      //   type: "http",
+      //   url: "https://api.githubcopilot.com/mcp/",
+      //   headers: {
+      //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
+      //   }
+      // },
 
       // weather: {
       //   command: "npx",
@@ -64,6 +75,7 @@ export async function test(): Promise<void> {
       // weather: {
       //   url: `http://localhost:${sseServerPort}/sse`,
       //   transport: "streamable_http"  // Force Streamable HTTP
+      //   // type: "http"  // VSCode-style config works too
       // },
       
       // weather: {
@@ -134,18 +146,21 @@ export async function test(): Promise<void> {
 
     // const llm = new ChatAnthropic({
     //   // https://docs.anthropic.com/en/docs/about-claude/pricing
+    //   // https://console.anthropic.com/settings/billing
     //   model: "claude-3-5-haiku-latest"
     //   // model: "claude-sonnet-4-0"
     // });
 
     const llm = new ChatOpenAI({
       // https://platform.openai.com/docs/pricing
+      // https://platform.openai.com/settings/organization/billing/overview
       model: "gpt-4o-mini"
       // model: "o4-mini"
     });
 
     // const llm = new ChatGoogleGenerativeAI({
     //   // https://ai.google.dev/gemini-api/docs/pricing
+    //   // https://console.cloud.google.com/billing
     //   model: "gemini-2.0-flash"
     //   // model: "gemini-2.5-pro-preview-06-05"
     // });
@@ -165,6 +180,7 @@ export async function test(): Promise<void> {
     // const query = "Tell me the number of directories in the current directory";
     // const query = "Tell me the number of directories in `.`";
     const query = "Tomorrow's weather in SF?";
+    // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +
     //   "increment the coutns by 1, and show all the items in the DB."

@@ -25,7 +25,8 @@ import { Logger } from "./logger.js";
  */
 export interface CommandBasedConfig {
   url?: never;
-  transport?: never;
+  transport?: string;
+  type?: string;
   command: string;
   args?: string[];
   env?: Record<string, string>;
@@ -42,6 +43,8 @@ export interface CommandBasedConfig {
 export interface UrlBasedConfig {
   url: string;
   transport?: string;
+  type?: string;
+  headers?: Record<string, string>;
   command?: never;
   args?: never;
   env?: never;
@@ -222,7 +225,7 @@ export async function convertMcpToLangchainTools(
  *     performing schema conversions to help track which servers need upstream fixes.
  * 
  * Gemini supports only a limited subset of OpenAPI 3.0 Schema properties:
- * - string: enum, format (only 'date-time' documented)  
+ * - string: enum, format (only "date-time" documented)  
  * - integer/number: format only
  * - array: minItems, maxItems, items
  * - object: properties, required, propertyOrdering, nullable
@@ -241,7 +244,7 @@ export async function convertMcpToLangchainTools(
  * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
  */
 function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?: string): any {
-  if (typeof schema !== 'object' || schema === null) {
+  if (typeof schema !== "object" || schema === null) {
     return schema;
   }
   
@@ -251,27 +254,27 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
   
   // Remove unsupported properties
   if (sanitized.exclusiveMinimum !== undefined) {
-    removedProperties.push('exclusiveMinimum');
+    removedProperties.push("exclusiveMinimum");
     delete sanitized.exclusiveMinimum;
   }
   if (sanitized.exclusiveMaximum !== undefined) {
-    removedProperties.push('exclusiveMaximum');
+    removedProperties.push("exclusiveMaximum");
     delete sanitized.exclusiveMaximum;
   }
   
   // Convert exclusiveMinimum/Maximum to minimum/maximum if needed
   if (schema.exclusiveMinimum !== undefined) {
     sanitized.minimum = schema.exclusiveMinimum;
-    convertedProperties.push('exclusiveMinimum → minimum');
+    convertedProperties.push("exclusiveMinimum → minimum");
   }
   if (schema.exclusiveMaximum !== undefined) {
     sanitized.maximum = schema.exclusiveMaximum;
-    convertedProperties.push('exclusiveMaximum → maximum');
+    convertedProperties.push("exclusiveMaximum → maximum");
   }
   
-  // Remove unsupported string formats (Gemini only supports 'enum' and 'date-time')
-  if (sanitized.type === 'string' && sanitized.format) {
-    const supportedFormats = ['enum', 'date-time'];
+  // Remove unsupported string formats (Gemini only supports "enum" and "date-time")
+  if (sanitized.type === "string" && sanitized.format) {
+    const supportedFormats = ["enum", "date-time"];
     if (!supportedFormats.includes(sanitized.format)) {
       removedProperties.push(`format: ${sanitized.format}`);
       delete sanitized.format;
@@ -282,12 +285,12 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
   if (logger && toolName && (removedProperties.length > 0 || convertedProperties.length > 0)) {
     const changes = [];
     if (removedProperties.length > 0) {
-      changes.push(`removed: ${removedProperties.join(', ')}`);
+      changes.push(`removed: ${removedProperties.join(", ")}`);
     }
     if (convertedProperties.length > 0) {
-      changes.push(`converted: ${convertedProperties.join(', ')}`);
+      changes.push(`converted: ${convertedProperties.join(", ")}`);
     }
-    logger.warn(`MCP tool "${toolName}": schema sanitized for Gemini compatibility (${changes.join('; ')})`);
+    logger.warn(`MCP tool "${toolName}": schema sanitized for Gemini compatibility (${changes.join("; ")})`);
   }
   
   // Recursively process nested objects and arrays
@@ -316,7 +319,7 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
     sanitized.items = sanitizeSchemaForGemini(sanitized.items, logger, toolName);
   }
   
-  if (sanitized.additionalProperties && typeof sanitized.additionalProperties === 'object') {
+  if (sanitized.additionalProperties && typeof sanitized.additionalProperties === "object") {
     sanitized.additionalProperties = sanitizeSchemaForGemini(sanitized.additionalProperties, logger, toolName);
   }
   
@@ -358,6 +361,9 @@ function createStreamableHttpOptions(
     if (config.streamableHTTPOptions.sessionId) {
       options.sessionId = config.streamableHTTPOptions.sessionId;
     }
+
+  } else if (config.headers) {
+    options.requestInit = { headers: config.headers };
   }
   
   return Object.keys(options).length > 0 ? options : undefined;
@@ -393,6 +399,8 @@ function createSseOptions(
     
     if (config.sseOptions.requestInit) {
       options.requestInit = config.sseOptions.requestInit;
+    } else if (config.headers) {
+      options.requestInit = { headers: config.headers };
     }
   }
   
@@ -409,40 +417,144 @@ function createSseOptions(
  * @internal This function is meant to be used internally by createHttpTransportWithFallback
  */
 function is4xxError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
+  if (!error || typeof error !== "object") {
     return false;
   }
   
   // Check for common error patterns that indicate 4xx responses
   const errorObj = error as any;
   
-  // Check if it's a fetch Response error with status
-  if (errorObj.status && typeof errorObj.status === 'number') {
+  // Check if it"s a fetch Response error with status
+  if (errorObj.status && typeof errorObj.status === "number") {
     return errorObj.status >= 400 && errorObj.status < 500;
   }
   
   // Check if it's wrapped in a Response object
-  if (errorObj.response && errorObj.response.status && typeof errorObj.response.status === 'number') {
+  if (errorObj.response && errorObj.response.status && typeof errorObj.response.status === "number") {
     return errorObj.response.status >= 400 && errorObj.response.status < 500;
   }
   
   // Check for error messages that typically indicate 4xx errors
   const message = errorObj.message || errorObj.toString();
-  if (typeof message === 'string') {
+  if (typeof message === "string") {
     return /4[0-9]{2}/.test(message) || 
-           message.includes('Bad Request') ||
-           message.includes('Unauthorized') ||
-           message.includes('Forbidden') ||
-           message.includes('Not Found') ||
-           message.includes('Method Not Allowed');
+           message.includes("Bad Request") ||
+           message.includes("Unauthorized") ||
+           message.includes("Forbidden") ||
+           message.includes("Not Found") ||
+           message.includes("Method Not Allowed");
   }
   
   return false;
 }
 
 /**
+ * Tests MCP server transport support using direct POST InitializeRequest.
+ * Follows the official MCP specification's recommended approach for backwards compatibility.
+ *
+ * See: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility
+ *
+ * @param url - The URL to test
+ * @param config - URL-based server configuration
+ * @param logger - Logger instance for recording test attempts
+ * @param serverName - Server name for logging context
+ * @returns A promise that resolves to the detected transport type
+ * 
+ * @internal This function is meant to be used internally by createHttpTransportWithFallback
+ */
+async function testTransportSupport(
+  url: URL,
+  config: UrlBasedConfig,
+  logger: McpToolsLogger,
+  serverName: string
+): Promise<"streamable_http" | "sse"> {
+  logger.debug(`MCP server "${serverName}": testing transport support using InitializeRequest`);
+  
+  // Create InitializeRequest as per MCP specification
+  const initRequest = {
+    jsonrpc: "2.0" as const,
+    id: `transport-test-${Date.now()}`,
+    method: "initialize",
+    params: {
+      protocolVersion: "2024-11-05", // Latest supported version
+      capabilities: {},
+      clientInfo: {
+        name: "mcp-transport-test",
+        version: "1.0.0"
+      }
+    }
+  };
+
+  // Prepare headers as required by MCP spec
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream" // Required by spec
+  };
+
+  // Add authentication headers if available
+  if (config.streamableHTTPOptions?.authProvider) {
+    try {
+      const tokens = await config.streamableHTTPOptions.authProvider.tokens();
+      if (tokens?.access_token) {
+        headers["Authorization"] = `${tokens.token_type || "Bearer"} ${tokens.access_token}`;
+        logger.debug(`MCP server "${serverName}": added authentication to transport test`);
+      }
+    } catch (authError) {
+      logger.debug(`MCP server "${serverName}": authentication setup failed for transport test:`, authError);
+    }
+  }
+
+  // Merge custom headers from config
+  if (config.streamableHTTPOptions?.requestInit?.headers) {
+    Object.assign(headers, config.streamableHTTPOptions.requestInit.headers);
+  }
+  if (config.sseOptions?.requestInit?.headers) {
+    Object.assign(headers, config.sseOptions.requestInit.headers);
+  }
+
+  try {
+    logger.debug(`MCP server "${serverName}": POST InitializeRequest to test Streamable HTTP support`);
+    
+    // POST InitializeRequest directly to test Streamable HTTP support
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(initRequest),
+      ...config.streamableHTTPOptions?.requestInit
+    });
+
+    logger.debug(`MCP server "${serverName}": transport test response: ${response.status} ${response.statusText}`);
+    
+    if (response.ok) {
+      // Success indicates Streamable HTTP support
+      logger.info(`MCP server "${serverName}": detected Streamable HTTP transport support`);
+      return "streamable_http";
+    } else if (response.status >= 400 && response.status < 500) {
+      // 4xx error indicates fallback to SSE per MCP spec
+      logger.info(`MCP server "${serverName}": received ${response.status}, falling back to SSE transport`);
+      return "sse";
+    } else {
+      // Other errors should be re-thrown
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+  } catch (error) {
+    // Network errors or other issues
+    logger.debug(`MCP server "${serverName}": transport test failed:`, error);
+    
+    // Check if it's a 4xx-like error
+    if (is4xxError(error)) {
+      logger.info(`MCP server "${serverName}": transport test failed with 4xx-like error, falling back to SSE`);
+      return "sse";
+    }
+    
+    // Re-throw other errors (network issues, etc.)
+    throw error;
+  }
+}
+
+/**
  * Creates an HTTP transport with automatic fallback from Streamable HTTP to SSE.
- * Follows the MCP specification recommendation to try Streamable HTTP first,
+ * Follows the MCP specification recommendation to test with direct POST InitializeRequest first,
  * then fall back to SSE if a 4xx error is encountered.
  *
  * See: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility
@@ -462,36 +574,37 @@ async function createHttpTransportWithFallback(
   serverName: string
 ): Promise<Transport> {
   // If transport is explicitly specified, respect user's choice
-  if (config.transport === "streamable_http") {
+  if (config.transport === "streamable_http" || config.transport === "http" ||
+    config.type === "streamable_http" || config.type === "http"
+  ) {
     logger.debug(`MCP server "${serverName}": using explicitly configured Streamable HTTP transport`);
     const options = createStreamableHttpOptions(config, logger, serverName);
     return new StreamableHTTPClientTransport(url, options);
   }
   
-  if (config.transport === "sse") {
+  if (config.transport === "sse" || config.type === "sse") {
     logger.debug(`MCP server "${serverName}": using explicitly configured SSE transport`);
     const options = createSseOptions(config, logger, serverName);
     return new SSEClientTransport(url, options);
   }
   
-  // Auto-detection: try Streamable HTTP first, fall back to SSE on 4xx errors
-  logger.debug(`MCP server "${serverName}": attempting Streamable HTTP transport with SSE fallback`);
+  // Auto-detection: test with POST InitializeRequest per MCP specification
+  logger.debug(`MCP server "${serverName}": auto-detecting transport using MCP specification method`);
   
   try {
-    const options = createStreamableHttpOptions(config, logger, serverName);
-    const transport = new StreamableHTTPClientTransport(url, options);
-    logger.info(`MCP server "${serverName}": successfully created Streamable HTTP transport`);
-    return transport;
+    const detectedTransport = await testTransportSupport(url, config, logger, serverName);
     
-  } catch (error) {
-    if (is4xxError(error)) {
-      logger.info(`MCP server "${serverName}": Streamable HTTP failed with 4xx error, falling back to SSE transport`);
+    if (detectedTransport === "streamable_http") {
+      const options = createStreamableHttpOptions(config, logger, serverName);
+      return new StreamableHTTPClientTransport(url, options);
+    } else {
       const options = createSseOptions(config, logger, serverName);
       return new SSEClientTransport(url, options);
     }
     
-    // Re-throw non-4xx errors (network issues, etc.)
-    logger.error(`MCP server "${serverName}": Streamable HTTP transport creation failed with non-4xx error:`, error);
+  } catch (error) {
+    // If transport detection fails completely, log error and re-throw
+    logger.error(`MCP server "${serverName}": transport detection failed:`, error);
     throw error;
   }
 }
@@ -582,79 +695,14 @@ async function convertSingleMcpToLangchainTools(
       // Try to connect with Streamable HTTP first, fallback to SSE on 4xx errors
       let connectionSucceeded = false;
       
-      // If transport is explicitly specified, respect user's choice (no fallback)
-      if (urlConfig.transport === "streamable_http" || urlConfig.transport === "sse") {
-        transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
-      } else {
-        // Auto-detection with connection-level fallback
-        logger.debug(`MCP server "${serverName}": attempting Streamable HTTP transport with SSE fallback`);
-        
-        try {
-          // First attempt: Streamable HTTP
-          const options = createStreamableHttpOptions(urlConfig, logger, serverName);
-          transport = new StreamableHTTPClientTransport(url, options);
-          logger.info(`MCP server "${serverName}": created Streamable HTTP transport, attempting connection`);
-          
-          // Try to connect with Streamable HTTP
-          client = new Client(
-            {
-              name: "mcp-client",
-              version: "0.0.1",
-            },
-            {
-              capabilities: {},
-            }
-          );
-          
-          await client.connect(transport);
-          connectionSucceeded = true;
-          logger.info(`MCP server "${serverName}": successfully connected using Streamable HTTP`);
-          
-        } catch (error) {
-          if (is4xxError(error)) {
-            logger.info(`MCP server "${serverName}": Streamable HTTP failed with 4xx error, falling back to SSE transport`);
-            
-            // Cleanup failed transport and client
-            if (transport) {
-              try {
-                await transport.close();
-              } catch (cleanupError) {
-                logger.debug(`MCP server "${serverName}": cleanup error during fallback:`, cleanupError);
-              }
-            }
-            
-            // Fallback to SSE
-            const options = createSseOptions(urlConfig, logger, serverName);
-            transport = new SSEClientTransport(url, options);
-            logger.info(`MCP server "${serverName}": created SSE transport, attempting fallback connection`);
-            
-            // Create new client for SSE connection
-            client = new Client(
-              {
-                name: "mcp-client",
-                version: "0.0.1",
-              },
-              {
-                capabilities: {},
-              }
-            );
-            
-            await client.connect(transport);
-            connectionSucceeded = true;
-            logger.info(`MCP server "${serverName}": successfully connected using SSE fallback`);
-            
-          } else {
-            // Re-throw non-4xx errors (network issues, etc.)
-            logger.error(`MCP server "${serverName}": Streamable HTTP transport failed with non-4xx error:`, error);
-            throw error;
-          }
-        }
-      }
+      // Use the updated transport detection with MCP spec compliance
+      transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
+      logger.info(`MCP server "${serverName}": created transport, attempting connection`);
 
     } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
       transport = new WebSocketClientTransport(url);
 
-    } else {
+    } else if (!(config?.transport) || config?.transport === "stdio" || config?.type === "stdio") {
       // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
       // To avoid confusion, it was decided to automatically append it to the env
       // if not explicitly set by the config.
@@ -671,6 +719,11 @@ async function convertSingleMcpToLangchainTools(
         stderr: stdioServerConfig.stderr,
         cwd: stdioServerConfig.cwd
       });
+    } else {
+      throw new McpInitializationError(
+        serverName,
+        `Failed to initialize MCP server: ${serverName}: unknown transport type: ${config?.transport}`
+      );
     }
 
     // Only create client if not already created during auto-detection fallback
