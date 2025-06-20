@@ -1,6 +1,6 @@
 // Simple logger
 
-type LogLevelString = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+type LogLevelString = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
 enum LogLevel {
   TRACE = 0,
@@ -12,12 +12,12 @@ enum LogLevel {
 }
 
 const LOG_COLORS = {
-  [LogLevel.TRACE]: '\x1b[90m',   // Gray
-  [LogLevel.DEBUG]: '\x1b[90m',   // Gray
-  [LogLevel.INFO]: '\x1b[90m',    // Gray
-  [LogLevel.WARN]: '\x1b[1;93m',  // Bold bright yellow
-  [LogLevel.ERROR]: '\x1b[1;91m', // Bold bright red
-  [LogLevel.FATAL]: '\x1b[1;101m',// Red background, Bold text
+  [LogLevel.TRACE]: "\x1b[90m",   // Gray
+  [LogLevel.DEBUG]: "\x1b[90m",   // Gray
+  [LogLevel.INFO]: "\x1b[90m",    // Gray
+  [LogLevel.WARN]: "\x1b[1;93m",  // Bold bright yellow
+  [LogLevel.ERROR]: "\x1b[1;91m", // Bold bright red
+  [LogLevel.FATAL]: "\x1b[1;101m",// Red background, Bold text
 } as const;
 
 const LOG_LEVEL_MAP: Record<LogLevelString, LogLevel> = {
@@ -31,14 +31,14 @@ const LOG_LEVEL_MAP: Record<LogLevelString, LogLevel> = {
 
 class Logger {
   private readonly level: LogLevel;
-  private static readonly RESET = '\x1b[0m';
+  private static readonly RESET = "\x1b[0m";
 
   constructor({ level = LogLevel.INFO }: { level?: LogLevelString | LogLevel } = {}) {
     this.level = this.parseLogLevel(level);
   }
 
   private parseLogLevel(level: LogLevel | LogLevelString): LogLevel {
-    if (typeof level === 'number') return level;
+    if (typeof level === "number") return level;
     return LOG_LEVEL_MAP[level.toLowerCase() as LogLevelString];
   }
 
@@ -52,9 +52,9 @@ class Logger {
   }
 
   private formatValue(value: unknown): string {
-    if (value === null) return 'null';
-    if (value === undefined) return 'undefined';
-    return typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+    if (value === null) return "null";
+    if (value === undefined) return "undefined";
+    return typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
   }
 
   public trace(...args: unknown[]) { this.log(LogLevel.TRACE, ...args); }

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Issue #39: Support for VSCode style remote MCP protocol configurations
+
+### Fixed
+- Issue #40: HTTP backwards compatibility approach differs from the recommendations of the MCP spec
+
+### Changed
+- Consistently use double quotations instead of single quotations for string literals
+
 ## [0.2.6] - 2025-06-18
 
 ### Changed

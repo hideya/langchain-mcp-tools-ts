@@ -158,6 +158,7 @@ TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotoc
     "streamable-http-server": {
         url: `http://${server_host}:${server_port}/...`,
         transport: "streamable_http"
+        // type: "http"  // VSCode-style config works too
     },
 
     // Explicit SSE
@@ -171,6 +172,22 @@ TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotoc
         url: `ws://${ws_server_host}:${ws_server_port}/...`
     },
 ```
+
+For the convenience of adding authorization headers, the following shorthand expression is supported.
+This header configuration will be overridden if either `streamableHTTPOptions` or `sseOptions` is specified.
+
+```ts
+    github: {
+      type: "http",  // recommended to specify the protocol explicitly when authentication is used
+      url: "https://api.githubcopilot.com/mcp/",
+      headers: {
+        "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
+      }
+    },
+```
+
+NOTE: When accessing the GitHub MCP server, [GitHub PAT (Personal Access Token)](https://github.com/settings/personal-access-tokens)
+alone is not enough; your GitHub account must have an active Copilot subscription or be assigned a Copilot license through your organization.
 
 **Auto-detection behavior (default):**
 - For HTTP/HTTPS URLs without explicit `transport`, the library follows [MCP specification recommendations](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility)
