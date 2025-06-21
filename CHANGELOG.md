@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [0.2.8] - 2025-06-21
 
 ### Changed
 - Clean up the conditions for transport selection to ensure consistent checking
 
 ### Added
 - Update REAMDE.md and JSDocs to better reflect the current implementations 
+
 
 ## [0.2.7] - 2025-06-20
 
@@ -24,11 +25,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Consistently use double quotations instead of single quotations for string literals
 
+
 ## [0.2.6] - 2025-06-18
 
 ### Changed
 - Add `transport?: never;` to `CommandBasedConfig`
 - Remove mistakenly added `ws` from the dependencies
+
 
 ## [0.2.5] - 2025-06-18
 
@@ -38,6 +41,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Issue #34: Compatibility issue with OpenAI's Structured Outputs requirements
 - Issue #36: JSON Schema Compatibility Issues with Google Gemini Models
+
 
 ## [0.2.4] - 2025-04-24
 
