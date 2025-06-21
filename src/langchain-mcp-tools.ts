@@ -700,7 +700,26 @@ async function convertSingleMcpToLangchainTools(
         `Failed to initialize MCP server: ${serverName}: Either a command or a valid URL must be specified`
       );
     }
+    if (config?.command && url) {
+      throw new McpInitializationError(
+        serverName,
+        `Configuration error: Cannot specify both 'command' (${config.command}) and 'url' (${url.href}). Use 'command' for local servers or 'url' for remote servers.`
+      );
+    }
+
     const transportType = config?.transport || config?.type;
+
+    // Transport Selection Priority:
+    // 1. Explicit transport/type field (must match URL protocol if URL provided)
+    // 2. URL protocol auto-detection (http/https → StreamableHTTP, ws/wss → WebSocket)
+    // 3. Command presence → Stdio transport
+    // 4. Error if none of the above match
+    //
+    // Conflicts that cause errors:
+    // - Both url and command specified
+    // - transport/type doesn't match URL protocol
+    // - transport requires URL but no URL provided
+    // - transport requires command but no command provided
   
     if ((transportType === "http" || transportType === "streamable_http") ||
       (!transportType && (url?.protocol === "http:" || url?.protocol === "https:"))
