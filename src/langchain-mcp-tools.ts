@@ -21,6 +21,11 @@ import { Logger } from "./logger.js";
  * Configuration for a command-line based MCP server.
  * This is used for local MCP servers that are spawned as child processes.
  *
+ * @remarks
+ * The `transport` and `type` fields are optional for command-based configs.
+ * They can be useful for explicitly specifying "stdio" transport or for
+ * compatibility with VSCode-style configurations.
+ *
  * @public
  */
 export interface CommandBasedConfig {
@@ -39,18 +44,32 @@ export interface CommandBasedConfig {
  * Configuration for a URL-based MCP server.
  * This is used for remote MCP servers that are accessed via HTTP/HTTPS (SSE) or WebSocket.
  *
+ * @remarks
+ * The `headers` field provides a simple way to add authorization headers.
+ * However, it will be overridden if transport-specific options (streamableHTTPOptions or sseOptions)
+ * specify their own headers in requestInit.
+ *
  * @public
  */
 export interface UrlBasedConfig {
   url: string;
-  transport?: string;
-  type?: string;
+  transport?: string;  // Explicit transport selection
+  type?: string;       // VSCode-style config compatibility
   headers?: Record<string, string>;
   command?: never;
   args?: never;
   env?: never;
   stderr?: never;
   cwd?: never;
+
+  // Streamable HTTP specific options
+  streamableHTTPOptions?: {
+    authProvider?: OAuthClientProvider;
+    requestInit?: RequestInit;
+    reconnectionOptions?: StreamableHTTPReconnectionOptions;
+    sessionId?: string;
+  };
+
   // SSE client transport options
   sseOptions?: {
     // An OAuth client provider to use for authentication
@@ -59,12 +78,6 @@ export interface UrlBasedConfig {
     eventSourceInit?: EventSourceInit;
     // Customizes recurring POST requests to the server
     requestInit?: RequestInit;
-  };
-  streamableHTTPOptions?: {
-    authProvider?: OAuthClientProvider;
-    requestInit?: RequestInit;
-    reconnectionOptions?: StreamableHTTPReconnectionOptions;
-    sessionId?: string;
   };
 }
 
@@ -157,6 +170,12 @@ export class McpInitializationError extends Error implements McpError {
  *          - cleanup: Function to properly terminate all server connections
  *
  * @throws McpInitializationError if any server fails to initialize
+ *         (includes connection errors, tool listing failures, configuration validation errors)
+ *
+ * @remarks
+ * - Servers are initialized concurrently for better performance
+ * - Configuration is validated and will throw errors for conflicts (e.g., both url and command specified)
+ * - The cleanup function continues with remaining servers even if some cleanup operations fail
  *
  * @example
  * const { tools, cleanup } = await convertMcpToLangchainTools({
@@ -204,7 +223,8 @@ export async function convertMcpToLangchainTools(
     // Concurrently execute all the callbacks
     const results = await Promise.allSettled(cleanupCallbacks.map(callback => callback()));
 
-    // Log any cleanup failures
+    // Log any cleanup failures but continue with others
+    // This ensures that a single server cleanup failure doesn't prevent cleanup of other servers
     const failures = results.filter(result => result.status === "rejected");
     failures.forEach((failure, index) => {
       logger.error(`MCP server "${serverNames[index]}": failed to close: ${failure.reason}`);
@@ -469,7 +489,7 @@ async function testTransportSupport(
   logger: McpToolsLogger,
   serverName: string
 ): Promise<"streamable_http" | "sse"> {
-  logger.debug(`MCP server "${serverName}": testing transport support using InitializeRequest`);
+  logger.debug(`MCP server "${serverName}": testing Streamable HTTP suppor`);
   
   // Create InitializeRequest as per MCP specification
   const initRequest = {
@@ -477,7 +497,7 @@ async function testTransportSupport(
     id: `transport-test-${Date.now()}`,
     method: "initialize",
     params: {
-      protocolVersion: "2024-11-05", // Latest supported version
+      protocolVersion: "2024-11-05", // MCP Protocol version specified by the MCP specification for transport detection
       capabilities: {},
       clientInfo: {
         name: "mcp-transport-test",
@@ -511,6 +531,9 @@ async function testTransportSupport(
   }
   if (config.sseOptions?.requestInit?.headers) {
     Object.assign(headers, config.sseOptions.requestInit.headers);
+  }
+  if (config.headers) {
+    Object.assign(headers, config.headers);
   }
 
   try {
@@ -574,16 +597,15 @@ async function createHttpTransportWithFallback(
   logger: McpToolsLogger,
   serverName: string
 ): Promise<Transport> {
+  const transportType = config.transport || config.type;
   // If transport is explicitly specified, respect user's choice
-  if (config.transport === "streamable_http" || config.transport === "http" ||
-    config.type === "streamable_http" || config.type === "http"
-  ) {
+  if (transportType === "streamable_http" || transportType === "http") {
     logger.debug(`MCP server "${serverName}": using explicitly configured Streamable HTTP transport`);
     const options = createStreamableHttpOptions(config, logger, serverName);
     return new StreamableHTTPClientTransport(url, options);
   }
   
-  if (config.transport === "sse" || config.type === "sse") {
+  if (transportType === "sse") {
     logger.debug(`MCP server "${serverName}": using explicitly configured SSE transport`);
     const options = createSseOptions(config, logger, serverName);
     return new SSEClientTransport(url, options);
@@ -664,7 +686,7 @@ function makeZodSchemaOpenAICompatible(schema: z.ZodObject<any>): z.ZodObject<an
  *          - cleanup: Function to properly terminate the server connection
  *
  * @throws McpInitializationError if server initialization fails
- *         (includes connection errors, tool listing failures)
+ *         (includes connection errors, tool listing failures, configuration validation errors)
  *
  * @internal This function is meant to be called by convertMcpToLangchainTools
  */
@@ -688,8 +710,44 @@ async function convertSingleMcpToLangchainTools(
     } catch {
       // Ignore
     }
+
+    if (!config?.command && !url) {
+      throw new McpInitializationError(
+        serverName,
+        `Failed to initialize MCP server: ${serverName}: Either a command or a valid URL must be specified`
+      );
+    }
+    if (config?.command && url) {
+      throw new McpInitializationError(
+        serverName,
+        `Configuration error: Cannot specify both 'command' (${config.command}) and 'url' (${url.href}). Use 'command' for local servers or 'url' for remote servers.`
+      );
+    }
+
+    const transportType = config?.transport || config?.type;
+
+    // Transport Selection Priority:
+    // 1. Explicit transport/type field (must match URL protocol if URL provided)
+    // 2. URL protocol auto-detection (http/https → StreamableHTTP, ws/wss → WebSocket)
+    // 3. Command presence → Stdio transport
+    // 4. Error if none of the above match
+    //
+    // Conflicts that cause errors:
+    // - Both url and command specified
+    // - transport/type doesn't match URL protocol
+    // - transport requires URL but no URL provided
+    // - transport requires command but no command provided
   
-    if (url?.protocol === "http:" || url?.protocol === "https:") {
+    if ((transportType === "http" || transportType === "streamable_http") ||
+      (!transportType && (url?.protocol === "http:" || url?.protocol === "https:"))
+    ) {
+      if (!(url?.protocol === "http:" || url?.protocol === "https:"))  {
+        throw new McpInitializationError(
+          serverName,
+          `Failed to initialize MCP server: ${serverName}: URL protocol to be http: or https: : ${url}`
+        );
+      }
+
       // Use the new auto-detection logic with fallback
       const urlConfig = config as UrlBasedConfig;
       
@@ -700,10 +758,24 @@ async function convertSingleMcpToLangchainTools(
       transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
       logger.info(`MCP server "${serverName}": created transport, attempting connection`);
 
-    } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
+    } else if ((transportType === "ws" || transportType === "websocket") ||
+      (!transportType && (url?.protocol === "ws:" || url?.protocol === "wss:"))
+    ) {
+      if (!(url?.protocol === "ws:" || url?.protocol === "wss:"))  {
+        throw new McpInitializationError(
+          serverName,
+          `Failed to initialize MCP server: ${serverName}: URL protocol to be ws: or wss: : ${url}`
+        );
+      }
       transport = new WebSocketClientTransport(url);
 
-    } else if (!(config?.transport) || config?.transport === "stdio" || config?.type === "stdio") {
+    } else if ((transportType === "stdio" || !transportType && config?.command)) {
+      if (!config?.command)  {
+        throw new McpInitializationError(
+          serverName,
+          `Failed to initialize MCP server: ${serverName}: command to be specified`
+        );
+      }
       // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
       // To avoid confusion, it was decided to automatically append it to the env
       // if not explicitly set by the config.
@@ -723,7 +795,7 @@ async function convertSingleMcpToLangchainTools(
     } else {
       throw new McpInitializationError(
         serverName,
-        `Failed to initialize MCP server: ${serverName}: unknown transport type: ${config?.transport}`
+        `Failed to initialize MCP server: ${serverName}: Unknown transport type: ${config?.transport}`
       );
     }
 
@@ -749,7 +821,12 @@ async function convertSingleMcpToLangchainTools(
     );
 
     const tools = toolsResponse.tools.map((tool) => {
-      // Apply sanitization for all LLMs (harmless for non-Gemini providers)
+      // Schema transformation pipeline for LLM compatibility:
+      // 1. Sanitize for Gemini (removes unsupported properties)
+      //    Ref: https://ai.google.dev/gemini-api/docs/structured-output#json-schemas
+      // 2. Convert to Zod schema for LangChain compatibility
+      // 3. Make OpenAI-compatible (optional fields become nullable)
+      //    Ref: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
       const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
       const baseSchema = jsonSchemaToZod(sanitizedSchema as JsonSchema) as z.ZodObject<any>;
       // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
@@ -784,6 +861,9 @@ async function convertSingleMcpToLangchainTools(
               return "";
             }
 
+            // Extract text content from tool results
+            // MCP tools can return multiple content types, but this library currently uses
+            // LangChain's 'content' response format which only supports text strings
             const textContent = result.content
               .filter(content => content.type === "text")
               .map(content => content.text)
