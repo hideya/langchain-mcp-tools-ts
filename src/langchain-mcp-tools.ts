@@ -1,5 +1,6 @@
 import { IOType } from "node:child_process";
 import { Stream } from "node:stream";
+import { EventTarget } from "node:events";
 import { DynamicStructuredTool, StructuredTool } from "@langchain/core/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport, SSEClientTransportOptions } from "@modelcontextprotocol/sdk/client/sse.js";
@@ -15,6 +16,13 @@ import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { convertJsonSchemaToZod } from "zod-from-json-schema";
 import { z } from "zod";
 import { Logger } from "./logger.js";
+import { setMaxListeners } from "node:events";
+
+// Increase the default max listeners to handle multiple schema conversions
+setMaxListeners(20);
+
+// Cache for schema conversions to avoid repeated processing
+const schemaCache = new Map<string, z.ZodObject<any>>();
 
 
 /**
@@ -827,15 +835,27 @@ async function convertSingleMcpToLangchainTools(
       // 2. Convert to Zod schema for LangChain compatibility
       // 3. Make OpenAI-compatible (optional fields become nullable)
       //    Ref: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
-      const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
-      const baseSchema = convertJsonSchemaToZod(sanitizedSchema);
-
-      // For tool parameters, we expect object schemas. If we get something else,
-      // we'll trust that the MCP server provided a valid object schema.
-      const objectSchema = baseSchema as unknown as z.ZodObject<any>;
-
-      // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
-      const compatibleSchema = makeZodSchemaOpenAICompatible(objectSchema);
+      
+      // Create cache key from schema
+      const schemaKey = `${serverName}/${tool.name}:${JSON.stringify(tool.inputSchema)}`;
+      
+      let compatibleSchema: z.ZodObject<any>;
+      if (schemaCache.has(schemaKey)) {
+        compatibleSchema = schemaCache.get(schemaKey)!;
+      } else {
+        const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
+        const baseSchema = convertJsonSchemaToZod(sanitizedSchema);
+        
+        // For tool parameters, we expect object schemas. If we get something else,
+        // we'll trust that the MCP server provided a valid object schema.
+        const objectSchema = baseSchema as unknown as z.ZodObject<any>;
+        
+        // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
+        compatibleSchema = makeZodSchemaOpenAICompatible(objectSchema);
+        
+        // Cache the result
+        schemaCache.set(schemaKey, compatibleSchema);
+      }
       
       return new DynamicStructuredTool({
         name: tool.name,
