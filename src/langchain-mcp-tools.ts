@@ -43,14 +43,23 @@ export interface CommandBasedConfig {
  */
 export interface UrlBasedConfig {
   url: string;
-  transport?: string;
-  type?: string;
+  transport?: string;  // Explicit transport selection
+  type?: string;       // VSCode-style config compatibility
   headers?: Record<string, string>;
   command?: never;
   args?: never;
   env?: never;
   stderr?: never;
   cwd?: never;
+
+  // Streamable HTTP specific options
+  streamableHTTPOptions?: {
+    authProvider?: OAuthClientProvider;
+    requestInit?: RequestInit;
+    reconnectionOptions?: StreamableHTTPReconnectionOptions;
+    sessionId?: string;
+  };
+
   // SSE client transport options
   sseOptions?: {
     // An OAuth client provider to use for authentication
@@ -59,12 +68,6 @@ export interface UrlBasedConfig {
     eventSourceInit?: EventSourceInit;
     // Customizes recurring POST requests to the server
     requestInit?: RequestInit;
-  };
-  streamableHTTPOptions?: {
-    authProvider?: OAuthClientProvider;
-    requestInit?: RequestInit;
-    reconnectionOptions?: StreamableHTTPReconnectionOptions;
-    sessionId?: string;
   };
 }
 
