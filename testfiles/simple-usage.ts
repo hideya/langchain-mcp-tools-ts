@@ -167,7 +167,7 @@ export async function test(): Promise<void> {
     //   // https://ai.google.dev/gemini-api/docs/pricing
     //   // https://console.cloud.google.com/billing
     //   model: "gemini-2.0-flash"
-    //   // model: "gemini-2.5-pro-preview-06-05"
+    //   // model: "gemini-1.5-pro"
     // });
 
     const agent = createReactAgent({

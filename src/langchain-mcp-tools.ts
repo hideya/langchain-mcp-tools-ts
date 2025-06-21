@@ -911,7 +911,7 @@ async function convertSingleMcpToLangchainTools(
     }
     throw new McpInitializationError(
       serverName,
-      `Failed to initialize MCP server: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to initialize MCP server: ${serverName}: ${error instanceof Error ? error.message : String(error)}`,
       error
     );
   }
