@@ -65,24 +65,27 @@ export async function test(): Promise<void> {
       
       // // THIS DOESN'T WORK: Example of explicit transport selection:
       // weather: {
-      //   url: `http://localhost:${sseServerPort}/sse`,
+      //   url: `http://localhost:${streamableHttpServerPort}/mcp`,
       //   transport: "streamable_http"  // Force Streamable HTTP
-      //   // type: "http"  // VSCode-style config works too
+      //   // type: "http"  // VSCode-style config also works instead of the above
       // },
       
       // weather: {
       //   url: `http://localhost:${sseServerPort}/sse`,
       //   transport: "sse"  // Force SSE
+      //   // type: "sse"  // This also works instead of the above
       // },
 
       // weather: {
       //   url: `ws://localhost:${wsServerPort}/message`
+      //   // optionally `transport: "ws"` or `type: "ws"`
       // },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
       // github: {
-      //   type: "http",
+      //   // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
+      //   type: "http",  // or `transport: "http",`
       //   url: "https://api.githubcopilot.com/mcp/",
       //   headers: {
       //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
