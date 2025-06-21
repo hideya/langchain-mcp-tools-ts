@@ -116,99 +116,10 @@ try [this LangChain application built with the utility](https://github.com/hidey
 For detailed information on how to use this library, please refer to the following document:  
 ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
 
-## Configuration Validation
-
-The library validates server configurations and will throw `McpInitializationError` for invalid configurations:
-
-- **Cannot specify both `url` and `command`**: Use `command` for local servers or `url` for remote servers
-- **Transport type must match URL protocol**: e.g., `transport: "http"` requires `http:` or `https:` URL
-- **Transport requires appropriate configuration**: HTTP/WS transports need URLs, stdio transport needs command
-
-Examples of configuration conflicts that cause errors:
-
-```ts
-// ❌ ERROR: Both url and command specified
-{
-  url: "http://example.com",
-  command: "npx",
-  args: ["server"]
-}
-
-// ❌ ERROR: HTTP transport with WebSocket URL
-{
-  url: "ws://example.com",
-  transport: "http"
-}
-
-// ❌ ERROR: Stdio transport with URL
-{
-  url: "http://example.com",
-  transport: "stdio"
-}
-```
-
 ## MCP Protocol Support
 
 This library supports **MCP Protocol version 2025-03-26** and maintains backwards compatibility with version 2024-11-05.
 It follows the [official MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/) for transport selection and backwards compatibility.
-
-## LLM Compatibility
-
-The library automatically handles schema compatibility for different LLM providers:
-
-- **Google Gemini**: Sanitizes schemas to remove unsupported properties (logs warnings when changes are made)
-- **OpenAI Structured Outputs**: Makes optional fields nullable as required by OpenAI's specification
-- **Anthropic Claude**: Works with schemas as-is
-- **Other providers**: Generally compatible with standard JSON schemas
-
-Schema transformations are applied automatically and logged at the `warn` level when changes are made, helping you identify which MCP servers might need upstream schema fixes for optimal compatibility.
-
-## Resource Management
-
-The returned `cleanup` function properly handles resource cleanup:
-
-- Closes all MCP server connections concurrently
-- Logs any cleanup failures without throwing errors
-- Continues cleanup of remaining servers even if some fail
-- Should always be called when done using the tools
-
-```ts
-const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
-
-try {
-  // Use tools with your LLM
-} finally {
-  // Always cleanup, even if errors occur
-  await cleanup();
-}
-```
-
-## Debugging and Logging
-
-The library provides configurable logging to help debug connection and tool execution issues:
-
-```ts
-// Configure log level
-const { tools, cleanup } = await convertMcpToLangchainTools(
-  mcpServers, 
-  { logLevel: "debug" }
-);
-
-// Use custom logger
-class MyLogger implements McpToolsLogger {
-  debug(...args: unknown[]) { console.log("[DEBUG]", ...args); }
-  info(...args: unknown[]) { console.log("[INFO]", ...args); }
-  warn(...args: unknown[]) { console.warn("[WARN]", ...args); }
-  error(...args: unknown[]) { console.error("[ERROR]", ...args); }
-}
-
-const { tools, cleanup } = await convertMcpToLangchainTools(
-  mcpServers,
-  { logger: new MyLogger() }
-);
-```
-
-Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
 
 ## Features
 
@@ -311,17 +222,11 @@ alone is not enough; your GitHub account must have an active Copilot subscriptio
 - Non-4xx errors (network issues, etc.) are re-thrown without fallback
 
 **Explicit transport selection:**
-- Set `transport: "streamable_http"` to force Streamable HTTP (no fallback)
-- VSCode-style config `type: "http"` also works instead of the above
+- Set `transport: "streamable_http"` (or VSCode-style config `type: "http"`) to force Streamable HTTP (no fallback)
 - Set `transport: "sse"` to force SSE transport
 - WebSocket URLs (`ws://` or `wss://`) always use WebSocket transport
 
-Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE transport. According to the [official MCP documentation](https://modelcontextprotocol.io/docs/concepts/transports):
-
-> "SSE as a standalone transport is deprecated as of protocol version 2025-03-26. It has been replaced by Streamable HTTP, which incorporates SSE as an optional streaming mechanism."
-
-Note that even when you specify the Streamable HTTP transport, you may see SSE activity in the logs, such as `Accept: text/event-stream`.
-This occurs when the MCP SDK chooses to use SSE for streaming server responses within the Streamable HTTP transport.
+Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE transport. According to the [official MCP documentation](https://modelcontextprotocol.io/docs/concepts/transports): "SSE as a standalone transport is deprecated as of protocol version 2025-03-26. It has been replaced by Streamable HTTP, which incorporates SSE as an optional streaming mechanism."
 
 ### Authentication Support for Streamable HTTP Connections
 
@@ -453,7 +358,7 @@ Test implementations are provided:
 ### Debug Steps
 
 1. **Enable debug logging**: Set `logLevel: "debug"` to see detailed connection and execution logs
-2. **Check server stderr**: Use `stderr` redirection to capture server error output
+2. **Check server stderr**: For stdio MCP servers, use `stderr` redirection to capture server error output
 3. **Test explicit transports**: Try forcing specific transport types to isolate auto-detection issues
 4. **Verify server independently**: Test the MCP server with other clients (e.g., MCP Inspector)
 
@@ -467,3 +372,96 @@ While MCP tools can return multiple content types (text, images, etc.), this lib
 ## Change Log
 
 Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/CHANGELOG.md)
+
+## Appendix
+
+### Configuration Validation
+
+The library validates server configurations and will throw `McpInitializationError` for invalid configurations:
+
+- **Cannot specify both `url` and `command`**: Use `command` for local servers or `url` for remote servers
+- **Transport type must match URL protocol**: e.g., `transport: "http"` requires `http:` or `https:` URL
+- **Transport requires appropriate configuration**: HTTP/WS transports need URLs, stdio transport needs command
+
+Examples of configuration conflicts that cause errors:
+
+```ts
+// ERROR: Both url and command specified
+{
+  url: "http://example.com",
+  command: "npx",
+  args: ["server"]
+}
+
+// ERROR: HTTP transport with WebSocket URL
+{
+  url: "ws://example.com",
+  transport: "http"
+}
+
+// ERROR: Stdio transport with URL
+{
+  url: "http://example.com",
+  transport: "stdio"
+}
+```
+
+### LLM Compatibility
+
+The library automatically handles schema compatibility for different LLM providers:
+
+- **Google Gemini**: Sanitizes schemas to remove unsupported properties (logs warnings when changes are made)
+- **OpenAI Structured Outputs**: Makes optional fields nullable as required by OpenAI's specification
+- **Anthropic Claude**: Works with schemas as-is
+- **Other providers**: Generally compatible with standard JSON schemas
+
+Schema transformations are applied automatically and logged at the `warn` level when changes are made, helping you identify which MCP servers might need upstream schema fixes for optimal compatibility.
+
+### Resource Management
+
+The returned `cleanup` function properly handles resource cleanup:
+
+- Closes all MCP server connections concurrently
+- Logs any cleanup failures without throwing errors
+- Continues cleanup of remaining servers even if some fail
+- Should always be called when done using the tools
+
+```ts
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+
+try {
+  // Use tools with your LLM
+} finally {
+  // Always cleanup, even if errors occur
+  await cleanup();
+}
+```
+
+### Debugging and Logging
+
+The library provides configurable logging to help debug connection and tool execution issues:
+
+```ts
+// Configure log level
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers, 
+  { logLevel: "debug" }
+);
+
+// Use custom logger
+class MyLogger implements McpToolsLogger {
+  debug(...args: unknown[]) { console.log("[DEBUG]", ...args); }
+  info(...args: unknown[]) { console.log("[INFO]", ...args); }
+  warn(...args: unknown[]) { console.warn("[WARN]", ...args); }
+  error(...args: unknown[]) { console.error("[ERROR]", ...args); }
+}
+
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers,
+  { logger: new MyLogger() }
+);
+```
+
+Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
+
+
