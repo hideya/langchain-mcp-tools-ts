@@ -12,7 +12,7 @@ import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/webso
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { jsonSchemaToZod, JsonSchema } from "@n8n/json-schema-to-zod";
+import { convertJsonSchemaToZod } from "zod-from-json-schema";
 import { z } from "zod";
 import { Logger } from "./logger.js";
 
@@ -828,9 +828,14 @@ async function convertSingleMcpToLangchainTools(
       // 3. Make OpenAI-compatible (optional fields become nullable)
       //    Ref: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
       const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
-      const baseSchema = jsonSchemaToZod(sanitizedSchema as JsonSchema) as z.ZodObject<any>;
+      const baseSchema = convertJsonSchemaToZod(sanitizedSchema);
+
+      // For tool parameters, we expect object schemas. If we get something else,
+      // we'll trust that the MCP server provided a valid object schema.
+      const objectSchema = baseSchema as unknown as z.ZodObject<any>;
+
       // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
-      const compatibleSchema = makeZodSchemaOpenAICompatible(baseSchema);
+      const compatibleSchema = makeZodSchemaOpenAICompatible(objectSchema);
       
       return new DynamicStructuredTool({
         name: tool.name,

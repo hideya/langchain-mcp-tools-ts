@@ -23,11 +23,11 @@ export async function test(): Promise<void> {
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the others.
   //
-  const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
-    "SSE",  "npx -y @h1deya/mcp-server-weather");
-  //
-  const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
-    "WS",  "npx -y @h1deya/mcp-server-weather");
+  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
+  //   "SSE",  "npx -y @h1deya/mcp-server-weather");
+  // //
+  // const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
+  //   "WS",  "npx -y @h1deya/mcp-server-weather");
 
   try {
     const mcpServers: McpServersConfig = {
@@ -50,18 +50,18 @@ export async function test(): Promise<void> {
         ]
       },
 
-      // weather: {
-      //   command: "npx",
-      //   args: [
-      //     "-y",
-      //    "@h1deya/mcp-server-weather"
-      //   ]
-      // },
-      
-      // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
       weather: {
-        url: `http://localhost:${sseServerPort}/sse`
+        command: "npx",
+        args: [
+          "-y",
+         "@h1deya/mcp-server-weather"
+        ]
       },
+      
+      // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
+      // weather: {
+      //   url: `http://localhost:${sseServerPort}/sse`
+      // },
       
       // // THIS DOESN'T WORK: Example of explicit transport selection:
       // weather: {
@@ -184,7 +184,7 @@ export async function test(): Promise<void> {
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me the number of directories in the current directory";
     // const query = "Tell me the number of directories in `.`";
-    const query = "Tomorrow's weather in SF?";
+    const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +
