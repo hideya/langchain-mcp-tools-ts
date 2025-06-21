@@ -469,7 +469,7 @@ async function testTransportSupport(
   logger: McpToolsLogger,
   serverName: string
 ): Promise<"streamable_http" | "sse"> {
-  logger.debug(`MCP server "${serverName}": testing transport support using InitializeRequest`);
+  logger.debug(`MCP server "${serverName}": testing Streamable HTTP suppor`);
   
   // Create InitializeRequest as per MCP specification
   const initRequest = {
@@ -511,6 +511,9 @@ async function testTransportSupport(
   }
   if (config.sseOptions?.requestInit?.headers) {
     Object.assign(headers, config.sseOptions.requestInit.headers);
+  }
+  if (config.headers) {
+    Object.assign(headers, config.headers);
   }
 
   try {
@@ -574,16 +577,15 @@ async function createHttpTransportWithFallback(
   logger: McpToolsLogger,
   serverName: string
 ): Promise<Transport> {
+  const transportType = config.transport || config.type;
   // If transport is explicitly specified, respect user's choice
-  if (config.transport === "streamable_http" || config.transport === "http" ||
-    config.type === "streamable_http" || config.type === "http"
-  ) {
+  if (transportType === "streamable_http" || transportType === "http") {
     logger.debug(`MCP server "${serverName}": using explicitly configured Streamable HTTP transport`);
     const options = createStreamableHttpOptions(config, logger, serverName);
     return new StreamableHTTPClientTransport(url, options);
   }
   
-  if (config.transport === "sse" || config.type === "sse") {
+  if (transportType === "sse") {
     logger.debug(`MCP server "${serverName}": using explicitly configured SSE transport`);
     const options = createSseOptions(config, logger, serverName);
     return new SSEClientTransport(url, options);
@@ -688,8 +690,25 @@ async function convertSingleMcpToLangchainTools(
     } catch {
       // Ignore
     }
+
+    if (!config?.command && !url) {
+      throw new McpInitializationError(
+        serverName,
+        `Failed to initialize MCP server: ${serverName}: Either a command or a valid URL must be specified`
+      );
+    }
+    const transportType = config?.transport || config?.type;
   
-    if (url?.protocol === "http:" || url?.protocol === "https:") {
+    if ((transportType === "http" || transportType === "streamable_http") ||
+      (!transportType && (url?.protocol === "http:" || url?.protocol === "https:"))
+    ) {
+      if (!(url?.protocol === "http:" || url?.protocol === "https:"))  {
+        throw new McpInitializationError(
+          serverName,
+          `Failed to initialize MCP server: ${serverName}: URL protocol to be http: or https: : ${url}`
+        );
+      }
+
       // Use the new auto-detection logic with fallback
       const urlConfig = config as UrlBasedConfig;
       
@@ -700,10 +719,24 @@ async function convertSingleMcpToLangchainTools(
       transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
       logger.info(`MCP server "${serverName}": created transport, attempting connection`);
 
-    } else if (url?.protocol === "ws:" || url?.protocol === "wss:") {
+    } else if ((transportType === "ws" || transportType === "websocket") ||
+      (!transportType && (url?.protocol === "ws:" || url?.protocol === "wss:"))
+    ) {
+      if (!(url?.protocol === "ws:" || url?.protocol === "wss:"))  {
+        throw new McpInitializationError(
+          serverName,
+          `Failed to initialize MCP server: ${serverName}: URL protocol to be ws: or wss: : ${url}`
+        );
+      }
       transport = new WebSocketClientTransport(url);
 
-    } else if (!(config?.transport) || config?.transport === "stdio" || config?.type === "stdio") {
+    } else if ((transportType === "stdio" || !transportType && config?.command)) {
+      if (!config?.command)  {
+        throw new McpInitializationError(
+          serverName,
+          `Failed to initialize MCP server: ${serverName}: command to be specified`
+        );
+      }
       // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
       // To avoid confusion, it was decided to automatically append it to the env
       // if not explicitly set by the config.
@@ -723,7 +756,7 @@ async function convertSingleMcpToLangchainTools(
     } else {
       throw new McpInitializationError(
         serverName,
-        `Failed to initialize MCP server: ${serverName}: unknown transport type: ${config?.transport}`
+        `Failed to initialize MCP server: ${serverName}: Unknown transport type: ${config?.transport}`
       );
     }
 

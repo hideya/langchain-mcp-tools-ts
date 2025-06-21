@@ -76,7 +76,14 @@ const mcpServers: McpServersConfig = {
   fetch: {
     command: "uvx",
     args: ["mcp-server-fetch"]
-  }
+  },
+  github: {
+    type: "http",
+    url: "https://api.githubcopilot.com/mcp/",
+    headers: {
+      "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
+    }
+  },
 };
 
 const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
@@ -164,21 +171,23 @@ TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotoc
     // Explicit SSE
     "sse-server-name": {
         url: `http://${sse_server_host}:${sse_server_port}/...`,
-        transport: "sse"
+        transport: "sse"  // or type: "sse"
     },
 
     // WebSocket
     "ws-server-name": {
         url: `ws://${ws_server_host}:${ws_server_port}/...`
+        // optionally `transport: "ws"` or `type: "ws"`
     },
 ```
 
 For the convenience of adding authorization headers, the following shorthand expression is supported.
-This header configuration will be overridden if either `streamableHTTPOptions` or `sseOptions` is specified.
+This header configuration will be overridden if either `streamableHTTPOptions` or `sseOptions` is specified (details below).
 
 ```ts
     github: {
-      type: "http",  // recommended to specify the protocol explicitly when authentication is used
+      // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
+      type: "http",  // or `transport: "http",`
       url: "https://api.githubcopilot.com/mcp/",
       headers: {
         "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
@@ -186,7 +195,7 @@ This header configuration will be overridden if either `streamableHTTPOptions` o
     },
 ```
 
-NOTE: When accessing the GitHub MCP server, [GitHub PAT (Personal Access Token)](https://github.com/settings/personal-access-tokens)
+> NOTE: When accessing the GitHub MCP server, [GitHub PAT (Personal Access Token)](https://github.com/settings/personal-access-tokens)
 alone is not enough; your GitHub account must have an active Copilot subscription or be assigned a Copilot license through your organization.
 
 **Auto-detection behavior (default):**
