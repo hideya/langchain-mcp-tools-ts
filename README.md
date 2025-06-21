@@ -149,7 +149,8 @@ Examples of configuration conflicts that cause errors:
 
 ## MCP Protocol Support
 
-This library supports **MCP Protocol version 2024-11-05** and follows the [official MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/) for transport selection and backwards compatibility.
+This library supports **MCP Protocol version 2025-03-26** and maintains backwards compatibility with version 2024-11-05.
+It follows the [official MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/) for transport selection and backwards compatibility.
 
 ## LLM Compatibility
 
@@ -317,7 +318,7 @@ alone is not enough; your GitHub account must have an active Copilot subscriptio
 
 Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE transport. According to the [official MCP documentation](https://modelcontextprotocol.io/docs/concepts/transports):
 
-> "SSE as a standalone transport is deprecated as of protocol version 2024-11-05. It has been replaced by Streamable HTTP, which incorporates SSE as an optional streaming mechanism."
+> "SSE as a standalone transport is deprecated as of protocol version 2025-03-26. It has been replaced by Streamable HTTP, which incorporates SSE as an optional streaming mechanism."
 
 Note that even when you specify the Streamable HTTP transport, you may see SSE activity in the logs, such as `Accept: text/event-stream`.
 This occurs when the MCP SDK chooses to use SSE for streaming server responses within the Streamable HTTP transport.
