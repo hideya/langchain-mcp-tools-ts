@@ -116,6 +116,99 @@ try [this LangChain application built with the utility](https://github.com/hidey
 For detailed information on how to use this library, please refer to the following document:  
 ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
 
+## Configuration Validation
+
+The library validates server configurations and will throw `McpInitializationError` for invalid configurations:
+
+- **Cannot specify both `url` and `command`**: Use `command` for local servers or `url` for remote servers
+- **Transport type must match URL protocol**: e.g., `transport: "http"` requires `http:` or `https:` URL
+- **Transport requires appropriate configuration**: HTTP/WS transports need URLs, stdio transport needs command
+
+Examples of configuration conflicts that cause errors:
+
+```ts
+// ❌ ERROR: Both url and command specified
+{
+  url: "http://example.com",
+  command: "npx",
+  args: ["server"]
+}
+
+// ❌ ERROR: HTTP transport with WebSocket URL
+{
+  url: "ws://example.com",
+  transport: "http"
+}
+
+// ❌ ERROR: Stdio transport with URL
+{
+  url: "http://example.com",
+  transport: "stdio"
+}
+```
+
+## MCP Protocol Support
+
+This library supports **MCP Protocol version 2024-11-05** and follows the [official MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/) for transport selection and backwards compatibility.
+
+## LLM Compatibility
+
+The library automatically handles schema compatibility for different LLM providers:
+
+- **Google Gemini**: Sanitizes schemas to remove unsupported properties (logs warnings when changes are made)
+- **OpenAI Structured Outputs**: Makes optional fields nullable as required by OpenAI's specification
+- **Anthropic Claude**: Works with schemas as-is
+- **Other providers**: Generally compatible with standard JSON schemas
+
+Schema transformations are applied automatically and logged at the `warn` level when changes are made, helping you identify which MCP servers might need upstream schema fixes for optimal compatibility.
+
+## Resource Management
+
+The returned `cleanup` function properly handles resource cleanup:
+
+- Closes all MCP server connections concurrently
+- Logs any cleanup failures without throwing errors
+- Continues cleanup of remaining servers even if some fail
+- Should always be called when done using the tools
+
+```ts
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+
+try {
+  // Use tools with your LLM
+} finally {
+  // Always cleanup, even if errors occur
+  await cleanup();
+}
+```
+
+## Debugging and Logging
+
+The library provides configurable logging to help debug connection and tool execution issues:
+
+```ts
+// Configure log level
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers, 
+  { logLevel: "debug" }
+);
+
+// Use custom logger
+class MyLogger implements McpToolsLogger {
+  debug(...args: unknown[]) { console.log("[DEBUG]", ...args); }
+  info(...args: unknown[]) { console.log("[INFO]", ...args); }
+  warn(...args: unknown[]) { console.warn("[WARN]", ...args); }
+  error(...args: unknown[]) { console.error("[ERROR]", ...args); }
+}
+
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers,
+  { logger: new MyLogger() }
+);
+```
+
+Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
+
 ## Features
 
 ### `stderr` Redirection for Local MCP Server 
@@ -150,6 +243,18 @@ can be specified with the `"cwd"` key as follows:
 The key name `cwd` is derived from
 TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L39).
 
+**Note:** The library automatically adds the `PATH` environment variable to stdio servers if not explicitly provided to ensure servers can find required executables.
+
+### Transport Selection Priority
+
+The library selects transports using the following priority order:
+
+1. **Explicit transport/type field** (must match URL protocol if URL provided)
+2. **URL protocol auto-detection** (http/https → StreamableHTTP, ws/wss → WebSocket)
+3. **Command presence** → Stdio transport
+4. **Error** if none of the above match
+
+This ensures predictable behavior while allowing flexibility for different deployment scenarios.
 
 ### Remote MCP Server Support
 
@@ -304,10 +409,59 @@ Test implementations are provided:
   - MCP client uses this library: [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-client.ts)
   - Test MCP Server: [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-server.ts)
 
+## Troubleshooting
+
+### Common Configuration Errors
+
+**McpInitializationError: Cannot specify both 'command' and 'url'**
+- Remove either the `command` field (for URL-based servers) or the `url` field (for local stdio servers)
+- Use `command` for local MCP servers, `url` for remote servers
+
+**McpInitializationError: URL protocol to be http: or https:**
+- Check that your URL starts with `http://` or `https://` when using HTTP transport
+- For WebSocket servers, use `ws://` or `wss://` URLs
+
+**McpInitializationError: command to be specified**
+- Add a `command` field when using stdio transport
+- Ensure the command path is correct and the executable exists
+
+### Transport Detection Issues
+
+**Transport detection failed**
+- Server may not support the MCP protocol correctly
+- Try specifying an explicit transport type (`transport: "streamable_http"` or `transport: "sse"`)
+- Check server documentation for supported transport types
+
+**Connection timeout or network errors**
+- Verify the server URL and port are correct
+- Check that the server is running and accessible
+- Ensure firewall/network settings allow the connection
+
+### Tool Execution Problems
+
+**Schema sanitization warnings for Gemini compatibility**
+- These are informational and generally safe to ignore
+- Consider updating the MCP server to use Gemini-compatible schemas
+- Warnings help identify servers that may need upstream fixes
+
+**Tool calls returning empty results**
+- Check server logs (use `stderr` redirection to capture them)
+- Verify tool parameters match the expected schema
+- Enable debug logging to see detailed tool execution information
+
+### Debug Steps
+
+1. **Enable debug logging**: Set `logLevel: "debug"` to see detailed connection and execution logs
+2. **Check server stderr**: Use `stderr` redirection to capture server error output
+3. **Test explicit transports**: Try forcing specific transport types to isolate auto-detection issues
+4. **Verify server independently**: Test the MCP server with other clients (e.g., MCP Inspector)
+
 ## Limitations
 
-- Currently, only text results of tool calls are supported.
-- MCP features other than [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are not supported.
+- **Tool Return Types**: Currently, only text results of tool calls are supported.
+The library uses LangChain's `response_format: 'content'` (the default), which only supports text strings.
+While MCP tools can return multiple content types (text, images, etc.), this library currently filters and uses only text content.
+- **MCP Features**: Only MCP [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are supported. Other MCP features like Resources, Prompts, and Sampling are not implemented.
 
 ## Change Log
 

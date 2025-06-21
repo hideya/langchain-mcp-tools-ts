@@ -21,6 +21,11 @@ import { Logger } from "./logger.js";
  * Configuration for a command-line based MCP server.
  * This is used for local MCP servers that are spawned as child processes.
  *
+ * @remarks
+ * The `transport` and `type` fields are optional for command-based configs.
+ * They can be useful for explicitly specifying "stdio" transport or for
+ * compatibility with VSCode-style configurations.
+ *
  * @public
  */
 export interface CommandBasedConfig {
@@ -38,6 +43,11 @@ export interface CommandBasedConfig {
 /**
  * Configuration for a URL-based MCP server.
  * This is used for remote MCP servers that are accessed via HTTP/HTTPS (SSE) or WebSocket.
+ *
+ * @remarks
+ * The `headers` field provides a simple way to add authorization headers.
+ * However, it will be overridden if transport-specific options (streamableHTTPOptions or sseOptions)
+ * specify their own headers in requestInit.
  *
  * @public
  */
@@ -160,6 +170,12 @@ export class McpInitializationError extends Error implements McpError {
  *          - cleanup: Function to properly terminate all server connections
  *
  * @throws McpInitializationError if any server fails to initialize
+ *         (includes connection errors, tool listing failures, configuration validation errors)
+ *
+ * @remarks
+ * - Servers are initialized concurrently for better performance
+ * - Configuration is validated and will throw errors for conflicts (e.g., both url and command specified)
+ * - The cleanup function continues with remaining servers even if some cleanup operations fail
  *
  * @example
  * const { tools, cleanup } = await convertMcpToLangchainTools({
@@ -207,7 +223,8 @@ export async function convertMcpToLangchainTools(
     // Concurrently execute all the callbacks
     const results = await Promise.allSettled(cleanupCallbacks.map(callback => callback()));
 
-    // Log any cleanup failures
+    // Log any cleanup failures but continue with others
+    // This ensures that a single server cleanup failure doesn't prevent cleanup of other servers
     const failures = results.filter(result => result.status === "rejected");
     failures.forEach((failure, index) => {
       logger.error(`MCP server "${serverNames[index]}": failed to close: ${failure.reason}`);
@@ -480,7 +497,7 @@ async function testTransportSupport(
     id: `transport-test-${Date.now()}`,
     method: "initialize",
     params: {
-      protocolVersion: "2024-11-05", // Latest supported version
+      protocolVersion: "2024-11-05", // MCP Protocol version specified by the MCP specification for transport detection
       capabilities: {},
       clientInfo: {
         name: "mcp-transport-test",
@@ -669,7 +686,7 @@ function makeZodSchemaOpenAICompatible(schema: z.ZodObject<any>): z.ZodObject<an
  *          - cleanup: Function to properly terminate the server connection
  *
  * @throws McpInitializationError if server initialization fails
- *         (includes connection errors, tool listing failures)
+ *         (includes connection errors, tool listing failures, configuration validation errors)
  *
  * @internal This function is meant to be called by convertMcpToLangchainTools
  */
@@ -804,7 +821,10 @@ async function convertSingleMcpToLangchainTools(
     );
 
     const tools = toolsResponse.tools.map((tool) => {
-      // Apply sanitization for all LLMs (harmless for non-Gemini providers)
+      // Schema transformation pipeline for LLM compatibility:
+      // 1. Sanitize for Gemini (removes unsupported properties)
+      // 2. Convert to Zod schema for LangChain compatibility
+      // 3. Make OpenAI-compatible (optional fields become nullable)
       const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
       const baseSchema = jsonSchemaToZod(sanitizedSchema as JsonSchema) as z.ZodObject<any>;
       // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
@@ -839,6 +859,9 @@ async function convertSingleMcpToLangchainTools(
               return "";
             }
 
+            // Extract text content from tool results
+            // MCP tools can return multiple content types, but this library currently uses
+            // LangChain's 'content' response format which only supports text strings
             const textContent = result.content
               .filter(content => content.type === "text")
               .map(content => content.text)
