@@ -184,7 +184,7 @@ export async function test(): Promise<void> {
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me the number of directories in the current directory";
     // const query = "Tell me the number of directories in `.`";
-    const query = "Tomorrow's weather in SF?";
+    const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +
