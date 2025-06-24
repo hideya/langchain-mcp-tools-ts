@@ -12,7 +12,7 @@ import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/webso
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { jsonSchemaToZod, JsonSchema } from "@n8n/json-schema-to-zod";
+import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 import { z } from "zod";
 import { Logger } from "./logger.js";
 
@@ -656,6 +656,10 @@ function makeZodSchemaOpenAICompatible(schema: z.ZodObject<any>): z.ZodObject<an
   const shape = schema.shape;
   const newShape: Record<string, any> = {};
 
+  if (!shape) {
+    return z.object(newShape);
+  }
+
   for (const [key, value] of Object.entries(shape)) {
     if (value instanceof z.ZodOptional && !(value instanceof z.ZodNullable)) {
       // Convert .optional() to .optional().nullable() for OpenAI compatibility
@@ -773,7 +777,7 @@ async function convertSingleMcpToLangchainTools(
       if (!config?.command)  {
         throw new McpInitializationError(
           serverName,
-          `Failed to initialize MCP server: ${serverName}: command to be specified`
+          `Failed to initialize MCP server: ${serverName}: Command to be specified`
         );
       }
       // NOTE: Some servers (e.g. Brave) seem to require PATH to be set.
@@ -911,7 +915,7 @@ async function convertSingleMcpToLangchainTools(
     }
     throw new McpInitializationError(
       serverName,
-      `Failed to initialize MCP server: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to initialize MCP server: ${serverName}: ${error instanceof Error ? error.message : String(error)}`,
       error
     );
   }

@@ -153,7 +153,7 @@ describe('convertMcpToLangchainTools', () => {
 
     await expect(convertMcpToLangchainTools(config))
       .rejects
-      .toThrow('Failed to initialize MCP server: Connection failed');
+      .toThrow('Failed to initialize MCP server: failingServer: Connection failed');
   });
 
   it('should handle empty tool results correctly', async () => {
@@ -273,7 +273,7 @@ describe('convertMcpToLangchainTools', () => {
 
     await expect(convertMcpToLangchainTools(config))
       .rejects
-      .toThrow('Failed to initialize MCP server: Connection error');
+      .toThrow('Failed to initialize MCP server: errorServer: Connection error');
   });
 
   it('should handle missing tool descriptions', async () => {
@@ -341,6 +341,6 @@ describe('convertMcpToLangchainTools', () => {
     // We still expect the original error to be thrown
     await expect(convertMcpToLangchainTools(config))
       .rejects
-      .toThrow('Failed to initialize MCP server: Connection error');
+      .toThrow('Failed to initialize MCP server: errorServer: Connection error');
   });
 });
