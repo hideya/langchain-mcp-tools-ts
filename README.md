@@ -44,7 +44,7 @@ A python equivalent of this utility is available
 
 ## Prerequisites
 
-- Node.js 16+
+- Node.js 18+
 
 ## Installation
 

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Changed package from @n8n/json-schema-to-zod to @h1deya/json-schema-to-zod
+- Node.js prerequisites from 16+ to 18+
+- Updated dependencies
+
+
 ## [0.2.8] - 2025-06-21
 
 ### Changed

@@ -12,7 +12,7 @@ import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/webso
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { jsonSchemaToZod, JsonSchema } from "@n8n/json-schema-to-zod";
+import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 import { z } from "zod";
 import { Logger } from "./logger.js";
 
