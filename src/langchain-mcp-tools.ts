@@ -15,6 +15,7 @@ import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 import { z } from "zod";
 import { Logger } from "./logger.js";
+import { makeJsonSchemaOpenAICompatible } from "./openai-schema-compatibility.js";
 
 
 /**
@@ -826,14 +827,16 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
       // Schema transformation pipeline for LLM compatibility:
-      // 1. Sanitize for Gemini (removes unsupported properties)
-      //    Ref: https://ai.google.dev/gemini-api/docs/structured-output#json-schemas
-      // 2. Convert to Zod schema for LangChain compatibility
-      // 3. Make OpenAI-compatible (optional fields become nullable)
+      // 1. Make OpenAI-compatible (optional fields become nullable) - must be done at JSON Schema level
       //    Ref: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
-      const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
+      // 2. Sanitize for Gemini (removes unsupported properties)
+      //    Ref: https://ai.google.dev/gemini-api/docs/structured-output#json-schemas
+      // 3. Convert to Zod schema for LangChain compatibility
+      // 4. Additional Zod-level OpenAI compatibility (fallback)
+      const openAICompatibleSchema = makeJsonSchemaOpenAICompatible(tool.inputSchema);
+      const sanitizedSchema = sanitizeSchemaForGemini(openAICompatibleSchema, logger, `${serverName}/${tool.name}`);
       const baseSchema = jsonSchemaToZod(sanitizedSchema as JsonSchema) as z.ZodObject<any>;
-      // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
+      // Additional Zod-level transformation as fallback
       const compatibleSchema = makeZodSchemaOpenAICompatible(baseSchema);
       
       return new DynamicStructuredTool({
