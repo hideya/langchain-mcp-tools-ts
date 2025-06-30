@@ -46,7 +46,7 @@ export async function test(): Promise<void> {
           "@modelcontextprotocol/server-filesystem",
           "."  // path to a directory to allow access to
         ],
-        cwd: "/tmp"  // the working directory to be use by the server
+        // cwd: "/tmp"  // the working directory to be use by the server
       },
 
       fetch: {
@@ -181,15 +181,16 @@ export async function test(): Promise<void> {
     // const llm = new ChatOpenAI({
     //   // https://platform.openai.com/docs/pricing
     //   // https://platform.openai.com/settings/organization/billing/overview
-    //   model: "gpt-4o-mini"
+    //   model: "gpt-4.1-nano"
     //   // model: "o4-mini"
     // });
 
     const llm = new ChatGoogleGenerativeAI({
       // https://ai.google.dev/gemini-api/docs/pricing
       // https://console.cloud.google.com/billing
-      model: "gemini-2.0-flash"
-      // model: "gemini-1.5-pro"
+      // model: "gemini-2.0-flash"
+      model: "gemini-2.5-flash"
+      // model: "gemini-2.5-pro"
     });
 
     const agent = createReactAgent({
@@ -203,9 +204,9 @@ export async function test(): Promise<void> {
 
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
-    // const query = "Read and briefly summarize the LICENSE file";
+    const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me how many of directories in `.`";
-    const query = "Are there any weather alerts in California?";
+    // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +

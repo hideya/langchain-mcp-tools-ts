@@ -892,10 +892,10 @@ async function convertSingleMcpToLangchainTools(
       // 1. Start with original MCP schema
       let processedSchema = tool.inputSchema;
 
-      // // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues, removes nullable)
-      processedSchema = sanitizeSchemaForGemini(processedSchema, logger, `${serverName}/${tool.name}`);
+      // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues, removes nullable)
+      // processedSchema = sanitizeSchemaForGemini(processedSchema, logger, `${serverName}/${tool.name}`);
 
-      // // 3. THEN: Add OpenAI nullability (but skip nullable properties for Gemini compatibility)
+      // 3. THEN: Add OpenAI nullability (but skip nullable properties for Gemini compatibility)
       // processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
 
       // 4. Convert to Zod
