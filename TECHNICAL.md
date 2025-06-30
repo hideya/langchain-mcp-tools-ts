@@ -71,90 +71,44 @@ The widespread nature of this problem is evidenced by numerous libraries attempt
 - **Mastra**: "MCP Tool Compatibility Layer" for multiple providers
 - **Various OpenAI-compatible APIs**: Numerous attempts to create universal interfaces
 
-### Our Solution: Gemini-First Schema Transformation
+### The Severity Problem: Gemini's Hard Failures
 
-Given the incompatibility, we implemented a **provider-specific transformation pipeline**:
+Unlike OpenAI which issues warnings but continues execution, **Gemini terminates with cryptic 400 errors**:
 
-#### 1. Architecture Decision
-```typescript
-// 1. Sanitize for Gemini first (most restrictive)
-processedSchema = sanitizeSchemaForGemini(processedSchema, logger, toolName);
-
-// 2. Add OpenAI compatibility (conditional based on Gemini sanitization)  
-processedSchema = makeJsonSchemaOpenAICompatible(processedSchema, true);
+```
+GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from 
+https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: 
+[400 Bad Request] Unable to submit request because `edit_file` functionDeclaration 
+`parameters.dryRun` schema specified other fields alongside any_of. When using any_of, 
+it must be the only field set.
 ```
 
-#### 2. Gemini Sanitization (Most Critical)
-```typescript
-// CRITICAL: Remove nullable property entirely - Gemini doesn't support it
-if (sanitized.nullable !== undefined) {
-  removedProperties.push("nullable");
-  delete sanitized.nullable;
-}
+**This hard failure makes Gemini the "limiting factor"** - applications simply crash rather than degrading gracefully like with OpenAI.
 
-// Handle anyOf conflicts with other properties
-if (sanitized.anyOf || sanitized.oneOf || sanitized.allOf) {
-  const otherProps = Object.keys(sanitized).filter(key => 
-    key !== unionField && key !== '$schema' && key !== '$id'
-  );
-  
-  if (otherProps.length > 0) {
-    // Create clean schema with ONLY the union
-    const cleanSchema = { [unionField]: unionValue };
-    return cleanSchema;
-  }
-}
-```
+### Industry Gap: LangChain's Official Position  
 
-#### 3. Conditional OpenAI Compatibility
-```typescript
-function makeJsonSchemaOpenAICompatible(schema: any, isGeminiSanitized = false): any {
-  // Only add nullable properties if NOT pre-sanitized for Gemini
-  if (!required.has(key)) {
-    if (isGeminiSanitized) {
-      // Skip nullable for Gemini compatibility
-    } else {
-      // Add nullable for OpenAI compatibility
-      if (processedProp.type && !processedProp.nullable) {
-        processedProp.nullable = true;
-      }
-    }
-  }
-}
-```
+LangChain's official MCP adapters **do not address this compatibility issue**:
 
-### Results and Trade-offs
+#### **LangChain.js MCP Adapters Analysis**
+**Repository**: [langchainjs/libs/langchain-mcp-adapters](https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-mcp-adapters)  
+**Focus Areas**: Transport management, content handling, authentication  
+**Schema Compatibility**: **Not addressed**
 
-#### ✅ Achieved Compatibility
-- **Gemini**: Full compatibility, no errors
-- **OpenAI**: Basic function calling works with warnings
-- **Real-world Impact**: Both providers functional
+LangChain's adapters focus on:
+- Transport layer abstraction (stdio, SSE, Streamable HTTP)
+- Content block transformations (text, images, etc.)  
+- Authentication and configuration management
+- But **no schema transformations for provider compatibility**
 
-#### ⚠️ OpenAI Structured Outputs Limitation
-OpenAI displays warnings but continues to work:
-```
-Zod field at `#/definitions/edit_file/properties/dryRun` uses `.optional()` 
-without `.nullable()` which is not supported by the API.
-```
+#### **Evidence of Ongoing Issues**
+Active GitHub issues confirm compatibility problems persist:
+- **Issue #8218**: "Using ChatGoogleGenerativeAI with simple tool call under LangGraph ReactAgent throws error"
+- **Community workarounds**: Third-party forks mention "Google's Gemini models require tools to have non-empty parameter schemas"
 
-#### 🎯 Industry-Standard Approach
-Our solution aligns with industry best practices identified by Mastra and other compatibility layers.
+#### **LangChain's Design Philosophy**
+LangChain appears to take a **"pass-through" approach**:
+- Minimal adapter functionality
+- Raw MCP tool schemas passed directly to LLM providers
+- Compatibility issues left for users to resolve
 
-### Alternative Approaches Considered
-
-1. **Provider-Specific Schemas**: Generate completely separate schemas per provider
-2. **Lowest Common Denominator**: Avoid optional fields entirely  
-3. **Runtime Detection**: Detect provider and transform accordingly
-4. **Prompt-Based Workarounds**: Inject schema constraints into prompts (Mastra's approach)
-
-### Conclusion
-
-This schema compatibility issue represents a **fundamental market failure** in LLM API standardization. Our Gemini-first approach provides the most practical solution for multi-provider support, prioritizing the most restrictive provider while maintaining functional compatibility across the ecosystem.
-
-The widespread nature of this problem, evidenced by multiple commercial solutions and academic discussions, validates that this is not a local implementation issue but rather an **industry-wide compatibility crisis** that every serious LLM integration must address.
-
----
-
-## Contributing
-
-If you encounter additional technical issues or have solutions to the problems documented here, please contribute to this documentation by submitting a pull request with evidence and sources.
+### Our Solution: TBD
