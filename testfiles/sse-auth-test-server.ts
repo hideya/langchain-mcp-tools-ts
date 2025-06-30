@@ -183,9 +183,15 @@ app.get("/sse", authenticate, (req, res) => {
 app.post("/sse", authenticate, async (req, res) => {
   const sessionId = req.query.sessionId as string;
   
+  // Handle transport detection per MCP specification
+  // If no sessionId, this is likely a transport detection POST InitializeRequest
   if (!sessionId) {
-    return res.status(400).json({
-      error: { code: "missing_session_id", message: "Session ID is required" }
+    console.log("[SERVER] POST request to /sse without sessionId - returning 405 for transport detection");
+    return res.status(405).json({
+      error: {
+        code: "method_not_allowed",
+        message: "This server only supports SSE transport. Use GET for SSE connection."
+      }
     });
   }
   

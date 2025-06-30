@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+
+## [Unreleased]
+
+### Changed
+- Minor README.md refinements
+
+
+## [0.2.9] - 2025-06-24
+
+### Changed
+- Replace @n8n/json-schema-to-zod with the version that includes the ESM fix
+- Update Node.js prerequisites from 16+ to 18+
+- Updated dependencies
+
+## Fixed
+- Ensure `makeZodSchemaOpenAICompatible()` works even when schema.shape is undefined
+
+
 ## [0.2.8] - 2025-06-21
 
 ### Changed

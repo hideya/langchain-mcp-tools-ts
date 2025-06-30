@@ -1,18 +1,15 @@
-# MCP To LangChain Tools Conversion Utility / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools) [![network dependents](https://dependents.info/hideya/langchain-mcp-tools-ts/badge)](https://dependents.info/hideya/langchain-mcp-tools-ts)
+# MCP to LangChain Tools Conversion Utility / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools) [![network dependents](https://dependents.info/hideya/langchain-mcp-tools-ts/badge)](https://dependents.info/hideya/langchain-mcp-tools-ts)
 
-This is a simple, lightweight library intended to simplify the use of
+A simple, lightweight library intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools with LangChain.
 
 Its simplicity and extra features for stdio MCP servers can make it useful as a basis for your own customizations.
 However, it only supports text results of tool calls and does not support MCP features other than tools.
 
-LangChain's **official LangChain.js MCP Adapters** library,
-which supports comprehensive integration with LangChain, has been released at:
-- npmjs: https://www.npmjs.com/package/@langchain/mcp-adapters
-- github: https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-mcp-adapters`
-
-You may want to consider using the above if you don't have specific needs for this library.
+[LangChain's **official LangChain.js MCP Adapters** library](https://www.npmjs.com/package/@langchain/mcp-adapters),
+which supports comprehensive integration with LangChain, has been released.
+You may want to consider using it if you don't have specific needs for this library.
 
 ## Introduction
 
@@ -30,7 +27,7 @@ There are quite a few useful MCP servers already available:
 - [MCP.so - Find Awesome MCP Servers and Clients](https://mcp.so/)
 - [Smithery: MCP Server Registry](https://smithery.ai/)
 
-This utility's goal is to make these massive numbers of MCP servers easily accessible from LangChain.
+This utility's goal is to make these numerous MCP servers easily accessible from LangChain.
 
 It contains a utility function `convertMcpToLangchainTools()`.  
 This async function handles parallel initialization of specified multiple MCP servers
@@ -39,12 +36,12 @@ and converts their available tools into an array of LangChain-compatible tools.
 For detailed information on how to use this library, please refer to the following document:
 - ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
 
-A python equivalent of this utility is available
+A Python equivalent of this utility is available
 [here](https://pypi.org/project/langchain-mcp-tools)
 
 ## Prerequisites
 
-- Node.js 16+
+- Node.js 18+
 
 ## Installation
 
@@ -100,8 +97,8 @@ to be invoked to close all MCP server sessions when finished.
 The returned tools can be used with LangChain, e.g.:
 
 ```ts
-// import { ChatAnthropic } from "@langchain/anthropic";
-const llm = new ChatAnthropic({ model: "claude-sonnet-4-0" });
+// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+const llm = new ChatGoogleGenerativeAI({ model: "gemini-2.0-flash" })
 
 // import { createReactAgent } from "@langchain/langgraph/prebuilt";
 const agent = createReactAgent({
@@ -111,15 +108,30 @@ const agent = createReactAgent({
 ```
 
 For hands-on experimentation with MCP server integration,
-try [this LangChain application built with the utility](https://github.com/hideya/mcp-client-langchain-ts)
+try [this MCP Client CLI tool built with this library](https://www.npmjs.com/package/@h1deya/mcp-try-cli)
 
-For detailed information on how to use this library, please refer to the following document:  
-["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
+## Building from Source
+
+See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md) for details.
 
 ## MCP Protocol Support
 
 This library supports **MCP Protocol version 2025-03-26** and maintains backwards compatibility with version 2024-11-05.
 It follows the [official MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/) for transport selection and backwards compatibility.
+
+### Limitations
+
+- **Tool Return Types**: Currently, only text results of tool calls are supported.
+The library uses LangChain's `response_format: 'content'` (the default), which only supports text strings.
+While MCP tools can return multiple content types (text, images, etc.), this library currently filters and uses only text content.
+- **MCP Features**: Only MCP [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are supported. Other MCP features like Resources, Prompts, and Sampling are not implemented.
+
+### Notes:
+
+- **LLM Compatibility and Schema Transformations**: The library automatically performs schema transformations for LLM compatibility.
+  [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-compatibility) for details.
+- **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to stdio server configrations if not explicitly provided to ensure servers can find required executables.
+
 
 ## Features
 
@@ -154,8 +166,6 @@ can be specified with the `"cwd"` key as follows:
 
 The key name `cwd` is derived from
 TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L39).
-
-**Note:** The library automatically adds the `PATH` environment variable to stdio servers if not explicitly provided to ensure servers can find required executables.
 
 ### Transport Selection Priority
 
@@ -243,7 +253,8 @@ class MyOAuthProvider implements OAuthClientProvider {
 const mcpServers = {
   "secure-streamable-server": {
     url: "https://secure-mcp-server.example.com/mcp",
-    transport: "streamable_http",  // Optional: explicit transport
+    // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
+    transport: "streamable_http",  // or `type: "http",`
     streamableHTTPOptions: {
       // Provide an OAuth client provider
       authProvider: new MyOAuthProvider(),
@@ -270,57 +281,6 @@ Test implementations are provided:
 - **Streamable HTTP Authentication Tests**:
   - MCP client uses this library: [streamable-http-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-client.ts)
   - Test MCP Server:  [streamable-http-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-server.ts)
-
-### Authentication Support for SSE Connections (Legacy)
-
-The library also supports authentication for SSE connections to MCP servers.
-Note that SSE transport is deprecated; Streamable HTTP is the recommended approach.
-
-To enable authentication, provide SSE options in your server configuration:
-
-```ts
-import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-
-// Implement your own OAuth client provider
-class MyOAuthProvider implements OAuthClientProvider {
-  // Implementation details...
-}
-
-const mcpServers = {
-  "secure-server": {
-    url: "https://secure-mcp-server.example.com",
-    sseOptions: {
-      // Provide an OAuth client provider
-      authProvider: new MyOAuthProvider(),
-      
-      // Optionally customize the initial SSE request
-      eventSourceInit: {
-        // Custom options
-      },
-      
-      // Optionally customize recurring POST requests
-      requestInit: {
-        headers: {
-          'X-Custom-Header': 'custom-value'
-        }
-      }
-    }
-  }
-};
-```
-
-Test implementations are provided:
-
-- **SSE Authentication Tests**:
-  - MCP client uses this library: [sse-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-client.ts)
-  - Test MCP Server: [sse-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/sse-auth-test-server.ts)
-
-## Limitations
-
-- **Tool Return Types**: Currently, only text results of tool calls are supported.
-The library uses LangChain's `response_format: 'content'` (the default), which only supports text strings.
-While MCP tools can return multiple content types (text, images, etc.), this library currently filters and uses only text content.
-- **MCP Features**: Only MCP [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are supported. Other MCP features like Resources, Prompts, and Sampling are not implemented.
 
 ## Change Log
 
@@ -440,3 +400,7 @@ const { tools, cleanup } = await convertMcpToLangchainTools(
 ```
 
 Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
+
+### For Developers
+
+See [README_DEV.md](README_DEV.md) for more information about development and testing.
