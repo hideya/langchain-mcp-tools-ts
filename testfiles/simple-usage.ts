@@ -178,19 +178,19 @@ export async function test(): Promise<void> {
     //   // model: "claude-sonnet-4-0"
     // });
 
-    const llm = new ChatOpenAI({
-      // https://platform.openai.com/docs/pricing
-      // https://platform.openai.com/settings/organization/billing/overview
-      model: "gpt-4o-mini"
-      // model: "o4-mini"
-    });
-
-    // const llm = new ChatGoogleGenerativeAI({
-    //   // https://ai.google.dev/gemini-api/docs/pricing
-    //   // https://console.cloud.google.com/billing
-    //   model: "gemini-2.0-flash"
-    //   // model: "gemini-1.5-pro"
+    // const llm = new ChatOpenAI({
+    //   // https://platform.openai.com/docs/pricing
+    //   // https://platform.openai.com/settings/organization/billing/overview
+    //   model: "gpt-4o-mini"
+    //   // model: "o4-mini"
     // });
+
+    const llm = new ChatGoogleGenerativeAI({
+      // https://ai.google.dev/gemini-api/docs/pricing
+      // https://console.cloud.google.com/billing
+      model: "gemini-2.0-flash"
+      // model: "gemini-1.5-pro"
+    });
 
     const agent = createReactAgent({
       llm,
