@@ -24,16 +24,16 @@ export async function test(): Promise<void> {
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the others.
 
-  const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
-    "SSE",  "npx -y @h1deya/mcp-server-weather");
+  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
+  //   "SSE",  "npx -y @h1deya/mcp-server-weather");
 
-  // NOTE: without the following line, I got this error:
-  //   ReferenceError: WebSocket is not defined
-  //     at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
-  global.WebSocket = WebSocket as any;
-  
-  const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
-    "WS",  "npx -y @h1deya/mcp-server-weather");
+  // // NOTE: without the following line, I got this error:
+  // //   ReferenceError: WebSocket is not defined
+  // //     at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
+  // global.WebSocket = WebSocket as any;
+  //
+  // const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
+  //   "WS",  "npx -y @h1deya/mcp-server-weather");
 
   try {
     const mcpServers: McpServersConfig = {
@@ -56,29 +56,13 @@ export async function test(): Promise<void> {
         ]
       },
 
-      // "notion": {
-      //   "command": "npx",
-      //   "args": ["-y", "@suekou/mcp-notion-server"],
-      //   "env": {
-      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
-      //   }
-      // },
-
-      // notion: {
-      //   "command": "npx",
-      //   "args": ["-y", "@notionhq/notion-mcp-server"],
-      //   "env": {
-      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-      //   },
-      // },
-
-      // weather: {
-      //   command: "npx",
-      //   args: [
-      //     "-y",
-      //    "@h1deya/mcp-server-weather"
-      //   ]
-      // },
+      weather: {
+        command: "npx",
+        args: [
+          "-y",
+         "@h1deya/mcp-server-weather"
+        ]
+      },
       
       // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
       // weather: {
@@ -98,10 +82,26 @@ export async function test(): Promise<void> {
       //   // type: "sse"  // This also works instead of the above
       // },
 
-      weather: {
-        url: `ws://localhost:${wsServerPort}/message`
-        // optionally `transport: "ws"` or `type: "ws"`
-      },
+      // weather: {
+      //   url: `ws://localhost:${wsServerPort}/message`
+      //   // optionally `transport: "ws"` or `type: "ws"`
+      // },
+
+      // "notion": {
+      //   "command": "npx",
+      //   "args": ["-y", "@suekou/mcp-notion-server"],
+      //   "env": {
+      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
+      //   }
+      // },
+
+      // notion: {
+      //   "command": "npx",
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "env": {
+      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+      //   },
+      // },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -204,8 +204,8 @@ export async function test(): Promise<void> {
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
-    // const query = "Tell me how many of directories in `.`";
-    const query = "Are there any weather alerts in California?";
+    const query = "Tell me how many of directories in `.`";
+    // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +

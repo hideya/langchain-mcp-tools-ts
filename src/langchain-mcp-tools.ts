@@ -909,75 +909,61 @@ async function convertSingleMcpToLangchainTools(
     );
 
     const tools = toolsResponse.tools.map((tool) => {
-      // Schema transformation pipeline for LLM compatibility:
-      // 1. Make OpenAI-compatible at JSON schema level (handles deep nesting)
-      // 2. Sanitize for Gemini (removes unsupported properties)  
-      // 3. Convert to Zod schema for LangChain compatibility
-      
+      // 1. Start with original MCP schema
       let processedSchema = tool.inputSchema;
       
-      // Step 1: Deep OpenAI compatibility transformation at JSON schema level
-      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
-      
-      // Step 2: Sanitize for Gemini compatibility
+      // DEBUG: Log the original schema for the problematic tool
+      if (tool.name === 'edit_file') {
+        console.log(`\n=== ORIGINAL SCHEMA for ${tool.name} ===`);
+        console.log(JSON.stringify(processedSchema, null, 2));
+        
+        // Look specifically at the dryRun parameter
+        if (processedSchema.properties?.dryRun) {
+          console.log(`\n=== dryRun parameter ===`);
+          console.log(JSON.stringify(processedSchema.properties.dryRun, null, 2));
+        }
+      }
+
+      // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues)
       processedSchema = sanitizeSchemaForGemini(processedSchema, logger, `${serverName}/${tool.name}`);
-      
-      // Step 3: Convert to Zod schema
+
+      // DEBUG: Log after Gemini sanitization
+      if (tool.name === 'edit_file') {
+        console.log(`\n=== AFTER GEMINI SANITIZATION ===`);
+        console.log(JSON.stringify(processedSchema, null, 2));
+        
+        // Look specifically at the dryRun parameter
+        if (processedSchema.properties?.dryRun) {
+          console.log(`\n=== dryRun parameter after Gemini ===`);
+          console.log(JSON.stringify(processedSchema.properties.dryRun, null, 2));
+        }
+      }
+
+      // 3. THEN: Add OpenAI nullability (works on the already-clean schema)
+      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+
+      // DEBUG: Log final schema
+      if (tool.name === 'edit_file') {
+        console.log(`\n=== FINAL SCHEMA ===`);
+        console.log(JSON.stringify(processedSchema, null, 2));
+        
+        // Look specifically at the dryRun parameter
+        if (processedSchema.properties?.dryRun) {
+          console.log(`\n=== dryRun parameter FINAL ===`);
+          console.log(JSON.stringify(processedSchema.properties.dryRun, null, 2));
+        }
+      }
+
+      // Rest of your code...
       let zodSchema = jsonSchemaToZod(processedSchema as JsonSchema) as z.ZodTypeAny;
-      
-      // Ensure we have a ZodObject for DynamicStructuredTool
       const finalSchema = zodSchema instanceof z.ZodObject ? zodSchema : z.object({});
       
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
         schema: finalSchema,
-
         func: async function(input) {
-          logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
-
-          try {
-            // Execute tool call
-            const result = await client?.request(
-              {
-                method: "tools/call",
-                params: {
-                  name: tool.name,
-                  arguments: input,
-                },
-              },
-              CallToolResultSchema
-            );
-
-            // Handles null/undefined cases gracefully
-            if (!result?.content) {
-              logger.info(`MCP tool "${serverName}"/"${tool.name}" received null/undefined result`);
-              return "";
-            }
-
-            // Extract text content from tool results
-            // MCP tools can return multiple content types, but this library currently uses
-            // LangChain's 'content' response format which only supports text strings
-            const textContent = result.content
-              .filter(content => content.type === "text")
-              .map(content => content.text)
-              .join("\n\n");
-            // const textItems = result.content
-            //   .filter(content => content.type === "text")
-            //   .map(content => content.text)
-            // const textContent = JSON.stringify(textItems);
-
-            // Log rough result size for monitoring
-            const size = new TextEncoder().encode(textContent).length
-            logger.info(`MCP tool "${serverName}"/"${tool.name}" received result (size: ${size})`);
-
-            // If no text content, return a clear message describing the situation
-            return textContent || "No text content available in response";
-
-          } catch (error: unknown) {
-              logger.warn(`MCP tool "${serverName}"/"${tool.name}" caused error: ${error}`);
-              return `Error executing MCP tool: ${error}`;
-          }
+          // ... your existing func implementation
         },
       });
     });
