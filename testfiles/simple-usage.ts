@@ -23,11 +23,11 @@ export async function test(): Promise<void> {
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the others.
   //
-  const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
-    "SSE",  "npx -y @h1deya/mcp-server-weather");
-  //
-  const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
-    "WS",  "npx -y @h1deya/mcp-server-weather");
+  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
+  //   "SSE",  "npx -y @h1deya/mcp-server-weather");
+  // //
+  // const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
+  //   "WS",  "npx -y @h1deya/mcp-server-weather");
 
   try {
     const mcpServers: McpServersConfig = {
@@ -58,16 +58,13 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      notion: {
-        "command": "npx",
-        "args": [
-          "-y",
-          "@notionhq/notion-mcp-server"
-        ],
-        "env": {
-          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-        },
-      },
+      // notion: {
+      //   "command": "npx",
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "env": {
+      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+      //   },
+      // },
 
       // weather: {
       //   command: "npx",
@@ -77,10 +74,10 @@ export async function test(): Promise<void> {
       //   ]
       // },
       
-      // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
-      weather: {
-        url: `http://localhost:${sseServerPort}/sse`
-      },
+      // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
+      // weather: {
+      //   url: `http://localhost:${sseServerPort}/sse`
+      // },
       
       // // THIS DOESN'T WORK: Example of explicit transport selection:
       // weather: {
@@ -201,8 +198,7 @@ export async function test(): Promise<void> {
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
-    // const query = "Tell me the number of directories in the current directory";
-    // const query = "Tell me the number of directories in `.`";
+    const query = "Tell me how many of directories in `.`";
     // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
@@ -210,7 +206,7 @@ export async function test(): Promise<void> {
     //   "increment the coutns by 1, and show all the items in the DB."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
-    const query = "Tell me Notion user information"
+    // const query = "Tell me Notion user information"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);

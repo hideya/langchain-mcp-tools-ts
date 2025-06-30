@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Handle JSON schema OpenAI-compatibility better
 - Minor README.md refinements
 
 

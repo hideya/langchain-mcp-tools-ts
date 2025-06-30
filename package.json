@@ -64,7 +64,7 @@
     "publish:do": "npm run clean && npm install && npm publish --access=public"
   },
   "dependencies": {
-    "@h1deya/json-schema-to-zod": "^0.1.0",
+    "@h1deya/json-schema-to-zod": "^0.1.1",
     "@langchain/core": "^0.3.61",
     "@modelcontextprotocol/sdk": "^1.13.1",
     "zod": "^3.25.67"

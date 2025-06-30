@@ -348,6 +348,86 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
 }
 
 /**
+ * Recursively transforms a JSON Schema to be compatible with OpenAI's Structured Outputs requirements.
+ * 
+ * OpenAI requires that all optional fields must also be nullable. This function processes
+ * the raw JSON schema before it's converted to Zod, ensuring deep compatibility.
+ */
+function makeJsonSchemaOpenAICompatible(schema: any): any {
+  if (typeof schema !== "object" || schema === null) {
+    return schema;
+  }
+
+  const result = { ...schema };
+
+  // Handle object properties
+  if (result.properties) {
+    const processedProperties: Record<string, any> = {};
+    const required = new Set(result.required || []);
+
+    for (const [key, propSchema] of Object.entries(result.properties)) {
+      const processedProp = makeJsonSchemaOpenAICompatible(propSchema);
+      
+      // If the field is not required, make it nullable
+      if (!required.has(key)) {
+        if (processedProp.type && !processedProp.nullable) {
+          processedProp.nullable = true;
+        } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
+          processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
+        } else if (processedProp.oneOf && !processedProp.oneOf.some((s: any) => s.type === "null")) {
+          processedProp.oneOf = [...processedProp.oneOf, { type: "null" }];
+        }
+      }
+      
+      processedProperties[key] = processedProp;
+    }
+    
+    result.properties = processedProperties;
+  }
+
+  // Handle anyOf/oneOf/allOf recursively
+  if (result.anyOf) {
+    result.anyOf = result.anyOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
+  }
+  
+  if (result.oneOf) {
+    result.oneOf = result.oneOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
+  }
+  
+  if (result.allOf) {
+    result.allOf = result.allOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
+  }
+
+  // Handle array items
+  if (result.items) {
+    if (Array.isArray(result.items)) {
+      result.items = result.items.map(makeJsonSchemaOpenAICompatible);
+    } else {
+      result.items = makeJsonSchemaOpenAICompatible(result.items);
+    }
+  }
+
+  // Handle additionalProperties
+  if (result.additionalProperties && typeof result.additionalProperties === "object") {
+    result.additionalProperties = makeJsonSchemaOpenAICompatible(result.additionalProperties);
+  }
+
+  // Handle definitions (common in complex schemas)
+  if (result.definitions || result.$defs) {
+    const defsKey = result.definitions ? 'definitions' : '$defs';
+    const processedDefs: Record<string, any> = {};
+    
+    for (const [key, defSchema] of Object.entries(result[defsKey])) {
+      processedDefs[key] = makeJsonSchemaOpenAICompatible(defSchema);
+    }
+    
+    result[defsKey] = processedDefs;
+  }
+
+  return result;
+}
+
+/**
  * Creates Streamable HTTP transport options from configuration.
  * Consolidates repeated option configuration logic into a single reusable function.
  *
@@ -633,50 +713,6 @@ async function createHttpTransportWithFallback(
 }
 
 /**
- * Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
- *
- * OpenAI's Structured Outputs feature requires that all optional fields must also be nullable.
- * This function converts Zod schemas that use `.optional()` or `.default()` to also include
- * `.nullable()`, ensuring compatibility with OpenAI models while maintaining compatibility
- * with other LLM providers like Anthropic.
- * See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
- *
- * @param schema - The Zod object schema to transform
- * @returns A new Zod schema with optional/default fields made nullable
- *
- * @example
- * // Input schema: z.object({ name: z.string(), age: z.number().optional() })
- * // Output schema: z.object({ name: z.string(), age: z.number().optional().nullable() })
- *
- * @see {@link https://platform.openai.com/docs/guides/structured-outputs | OpenAI Structured Outputs Documentation}
- * 
- * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
- */
-function makeZodSchemaOpenAICompatible(schema: z.ZodObject<any>): z.ZodObject<any> {
-  const shape = schema.shape;
-  const newShape: Record<string, any> = {};
-
-  if (!shape) {
-    return z.object(newShape);
-  }
-
-  for (const [key, value] of Object.entries(shape)) {
-    if (value instanceof z.ZodOptional && !(value instanceof z.ZodNullable)) {
-      // Convert .optional() to .optional().nullable() for OpenAI compatibility
-      newShape[key] = value.nullable();
-    } else if (value instanceof z.ZodDefault && !(value instanceof z.ZodNullable)) {
-      // Convert .default() to .default().nullable() for OpenAI compatibility
-      newShape[key] = value.nullable();
-    } else {
-      // Keep existing fields unchanged (including already nullable fields)
-      newShape[key] = value;
-    }
-  }
-
-  return z.object(newShape);
-}
-
-/**
  * Initializes a single MCP server and converts its capabilities into LangChain tools.
  * Sets up a connection to the server, retrieves available tools, and creates corresponding
  * LangChain tool instances.
@@ -826,22 +862,28 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
       // Schema transformation pipeline for LLM compatibility:
-      // 1. Sanitize for Gemini (removes unsupported properties)
-      //    Ref: https://ai.google.dev/gemini-api/docs/structured-output#json-schemas
-      // 2. Convert to Zod schema for LangChain compatibility
-      // 3. Make OpenAI-compatible (optional fields become nullable)
-      //    Ref: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
-      const sanitizedSchema = sanitizeSchemaForGemini(tool.inputSchema, logger, `${serverName}/${tool.name}`);
-      const baseSchema = jsonSchemaToZod(sanitizedSchema as JsonSchema) as z.ZodObject<any>;
-      // Transforms a Zod schema to be compatible with OpenAI's Structured Outputs requirements.
-      const compatibleSchema = makeZodSchemaOpenAICompatible(baseSchema);
+      // 1. Make OpenAI-compatible at JSON schema level (handles deep nesting)
+      // 2. Sanitize for Gemini (removes unsupported properties)  
+      // 3. Convert to Zod schema for LangChain compatibility
+      
+      let processedSchema = tool.inputSchema;
+      
+      // Step 1: Deep OpenAI compatibility transformation at JSON schema level
+      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+      
+      // Step 2: Sanitize for Gemini compatibility
+      processedSchema = sanitizeSchemaForGemini(processedSchema, logger, `${serverName}/${tool.name}`);
+      
+      // Step 3: Convert to Zod schema
+      let zodSchema = jsonSchemaToZod(processedSchema as JsonSchema) as z.ZodTypeAny;
+      
+      // Ensure we have a ZodObject for DynamicStructuredTool
+      const finalSchema = zodSchema instanceof z.ZodObject ? zodSchema : z.object({});
       
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
-        // FIXME
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        schema: compatibleSchema,
+        schema: finalSchema,
 
         func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
