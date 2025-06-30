@@ -250,6 +250,8 @@ export async function convertMcpToLangchainTools(
  * @param logger - Optional logger for reporting sanitization actions
  * @param toolName - Optional tool name for logging context
  * @returns A sanitized schema compatible with Gemini
+ *
+ * @internal
  */
 function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?: string): any {
   if (typeof schema !== "object" || schema === null) {
@@ -375,10 +377,11 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
  * the schema will be used with OpenAI (detected by absence of prior Gemini sanitization).
  * 
  * @param schema - The JSON schema to transform for OpenAI compatibility
- * @param isGeminiSanitized - Whether this schema has already been sanitized for Gemini
  * @returns A transformed schema where all optional fields are also nullable
+ *
+ * @internal
  */
-function makeJsonSchemaOpenAICompatible(schema: any, isGeminiSanitized = false): any {
+function makeJsonSchemaOpenAICompatible(schema: any): any {
   if (typeof schema !== "object" || schema === null) {
     return schema;
   }
@@ -391,22 +394,16 @@ function makeJsonSchemaOpenAICompatible(schema: any, isGeminiSanitized = false):
     const required = new Set(result.required || []);
 
     for (const [key, propSchema] of Object.entries(result.properties)) {
-      const processedProp = makeJsonSchemaOpenAICompatible(propSchema, isGeminiSanitized);
+      const processedProp = makeJsonSchemaOpenAICompatible(propSchema);
       
       // If the field is not required, make it nullable
       if (!required.has(key)) {
-        if (isGeminiSanitized) {
-          // For Gemini: Don't add nullable, it's already been removed
-          // Gemini will handle optional fields automatically
-        } else {
-          // For OpenAI: Add nullability as before
-          if (processedProp.type && !processedProp.nullable) {
-            processedProp.nullable = true;
-          } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
-            processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
-          } else if (processedProp.oneOf && !processedProp.oneOf.some((s: any) => s.type === "null")) {
-            processedProp.oneOf = [...processedProp.oneOf, { type: "null" }];
-          }
+        if (processedProp.type && !processedProp.nullable) {
+          processedProp.nullable = true;
+        } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
+          processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
+        } else if (processedProp.oneOf && !processedProp.oneOf.some((s: any) => s.type === "null")) {
+          processedProp.oneOf = [...processedProp.oneOf, { type: "null" }];
         }
       }
       
@@ -418,29 +415,29 @@ function makeJsonSchemaOpenAICompatible(schema: any, isGeminiSanitized = false):
 
   // Handle anyOf/oneOf/allOf recursively
   if (result.anyOf) {
-    result.anyOf = result.anyOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema, isGeminiSanitized));
+    result.anyOf = result.anyOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
   }
   
   if (result.oneOf) {
-    result.oneOf = result.oneOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema, isGeminiSanitized));
+    result.oneOf = result.oneOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
   }
   
   if (result.allOf) {
-    result.allOf = result.allOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema, isGeminiSanitized));
+    result.allOf = result.allOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
   }
 
   // Handle array items
   if (result.items) {
     if (Array.isArray(result.items)) {
-      result.items = result.items.map((item: any) => makeJsonSchemaOpenAICompatible(item, isGeminiSanitized));
+      result.items = result.items.map((item: any) => makeJsonSchemaOpenAICompatible(item));
     } else {
-      result.items = makeJsonSchemaOpenAICompatible(result.items, isGeminiSanitized);
+      result.items = makeJsonSchemaOpenAICompatible(result.items);
     }
   }
 
   // Handle additionalProperties
   if (result.additionalProperties && typeof result.additionalProperties === "object") {
-    result.additionalProperties = makeJsonSchemaOpenAICompatible(result.additionalProperties, isGeminiSanitized);
+    result.additionalProperties = makeJsonSchemaOpenAICompatible(result.additionalProperties);
   }
 
   // Handle definitions (common in complex schemas)
@@ -449,7 +446,7 @@ function makeJsonSchemaOpenAICompatible(schema: any, isGeminiSanitized = false):
     const processedDefs: Record<string, any> = {};
     
     for (const [key, defSchema] of Object.entries(result[defsKey])) {
-      processedDefs[key] = makeJsonSchemaOpenAICompatible(defSchema, isGeminiSanitized);
+      processedDefs[key] = makeJsonSchemaOpenAICompatible(defSchema);
     }
     
     result[defsKey] = processedDefs;
@@ -895,11 +892,11 @@ async function convertSingleMcpToLangchainTools(
       // 1. Start with original MCP schema
       let processedSchema = tool.inputSchema;
 
-      // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues, removes nullable)
+      // // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues, removes nullable)
       processedSchema = sanitizeSchemaForGemini(processedSchema, logger, `${serverName}/${tool.name}`);
 
-      // 3. THEN: Add OpenAI nullability (but skip nullable properties for Gemini compatibility)
-      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema, true); // true = isGeminiSanitized
+      // // 3. THEN: Add OpenAI nullability (but skip nullable properties for Gemini compatibility)
+      // processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
 
       // 4. Convert to Zod
       let zodSchema = jsonSchemaToZod(processedSchema as JsonSchema) as z.ZodTypeAny;

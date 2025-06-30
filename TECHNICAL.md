@@ -2,7 +2,7 @@
 
 This document captures deep technical issues encountered during the implementation of this library, along with solutions and industry context.
 
-## 1. LLM Provider Schema Compatibility Crisis
+## 1. LLM Provider Schema Compatibility Issue
 
 ### Problem Statement
 
