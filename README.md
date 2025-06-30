@@ -11,6 +11,10 @@ However, it only supports text results of tool calls and does not support MCP fe
 which supports comprehensive integration with LangChain, has been released.
 You may want to consider using it if you don't have specific needs for this library.
 
+<a href="https://dependents.info/hideya/langchain-mcp-tools-ts">
+  <img src="https://dependents.info/hideya/langchain-mcp-tools-ts/image.svg" width="400px"/>
+</a>
+
 ## Introduction
 
 This package is intended to simplify the use of

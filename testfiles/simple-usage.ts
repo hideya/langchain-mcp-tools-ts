@@ -50,6 +50,25 @@ export async function test(): Promise<void> {
         ]
       },
 
+      // "notion": {
+      //   "command": "npx",
+      //   "args": ["-y", "@suekou/mcp-notion-server"],
+      //   "env": {
+      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
+      //   }
+      // },
+
+      notion: {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@notionhq/notion-mcp-server"
+        ],
+        "env": {
+          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+        },
+      },
+
       // weather: {
       //   command: "npx",
       //   args: [
@@ -184,13 +203,14 @@ export async function test(): Promise<void> {
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me the number of directories in the current directory";
     // const query = "Tell me the number of directories in `.`";
-    const query = "Are there any weather alerts in California?";
+    // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +
     //   "increment the coutns by 1, and show all the items in the DB."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
+    const query = "Tell me Notion user information"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
