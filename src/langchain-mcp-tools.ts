@@ -372,10 +372,6 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
 /**
  * Transforms a JSON Schema to be compatible with OpenAI's Structured Outputs requirements.
  * 
- * For Gemini compatibility, this function now avoids using `nullable` properties since
- * Gemini doesn't support them. Instead, it uses `anyOf` with null types only when 
- * the schema will be used with OpenAI (detected by absence of prior Gemini sanitization).
- * 
  * @param schema - The JSON schema to transform for OpenAI compatibility
  * @returns A transformed schema where all optional fields are also nullable
  *
