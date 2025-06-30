@@ -11,6 +11,10 @@ However, it only supports text results of tool calls and does not support MCP fe
 which supports comprehensive integration with LangChain, has been released.
 You may want to consider using it if you don't have specific needs for this library.
 
+<a href="https://dependents.info/hideya/langchain-mcp-tools-ts">
+  <img src="https://dependents.info/hideya/langchain-mcp-tools-ts/image.svg" width="400px"/>
+</a>
+
 ## Introduction
 
 This package is intended to simplify the use of
@@ -347,12 +351,22 @@ The library validates server configurations and will throw `McpInitializationErr
 
 The library automatically handles schema compatibility for different LLM providers:
 
-- **Google Gemini**: Sanitizes schemas to remove unsupported properties (logs warnings when changes are made)
-- **OpenAI Structured Outputs**: Makes optional fields nullable as required by OpenAI's specification
-- **Anthropic Claude**: Works with schemas as-is
-- **Other providers**: Generally compatible with standard JSON schemas
+- **OpenAI Structured Outputs**:
+  Makes optional fields nullable as required by OpenAI's strict specification.
+  Most MCP servers use standard JSON Schema practices (optional fields without explicit nullable),
+  so this transformation is applied automatically without logging.
 
-Schema transformations are applied automatically and logged at the `warn` level when changes are made, helping you identify which MCP servers might need upstream schema fixes for optimal compatibility.
+- **Google Gemini**:
+  Sanitizes schemas to remove unsupported properties like `exclusiveMinimum` and unsupported string formats.
+  Schema transformations are logged at the `warn` level when changes are made,
+  helping you identify which MCP servers might need upstream schema fixes for optimal Gemini compatibility.
+
+- **Anthropic Claude**: Works with schemas as-is using standard JSON Schema validation
+
+- **Other providers**: Generally compatible with standard JSON schemas after automatic transformations
+
+The library handles these compatibility requirements transparently,
+allowing you to use existing MCP servers with any supported LLM provider without modification.
 
 ### Resource Management
 

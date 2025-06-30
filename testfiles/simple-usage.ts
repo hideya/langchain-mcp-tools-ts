@@ -4,6 +4,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
+import WebSocket from 'ws';
 import * as fs from "fs";
 
 import {
@@ -22,10 +23,15 @@ export async function test(): Promise<void> {
   // If you are interested in testing the SSE/WS server setup, uncomment
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the others.
-  //
+
   const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
     "SSE",  "npx -y @h1deya/mcp-server-weather");
-  //
+
+  // NOTE: without the following line, I got this error:
+  //   ReferenceError: WebSocket is not defined
+  //     at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
+  global.WebSocket = WebSocket as any;
+  
   const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
     "WS",  "npx -y @h1deya/mcp-server-weather");
 
@@ -50,6 +56,22 @@ export async function test(): Promise<void> {
         ]
       },
 
+      // "notion": {
+      //   "command": "npx",
+      //   "args": ["-y", "@suekou/mcp-notion-server"],
+      //   "env": {
+      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
+      //   }
+      // },
+
+      // notion: {
+      //   "command": "npx",
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "env": {
+      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+      //   },
+      // },
+
       // weather: {
       //   command: "npx",
       //   args: [
@@ -58,10 +80,10 @@ export async function test(): Promise<void> {
       //   ]
       // },
       
-      // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
-      weather: {
-        url: `http://localhost:${sseServerPort}/sse`
-      },
+      // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
+      // weather: {
+      //   url: `http://localhost:${sseServerPort}/sse`
+      // },
       
       // // THIS DOESN'T WORK: Example of explicit transport selection:
       // weather: {
@@ -76,10 +98,10 @@ export async function test(): Promise<void> {
       //   // type: "sse"  // This also works instead of the above
       // },
 
-      // weather: {
-      //   url: `ws://localhost:${wsServerPort}/message`
-      //   // optionally `transport: "ws"` or `type: "ws"`
-      // },
+      weather: {
+        url: `ws://localhost:${wsServerPort}/message`
+        // optionally `transport: "ws"` or `type: "ws"`
+      },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -156,19 +178,19 @@ export async function test(): Promise<void> {
     //   // model: "claude-sonnet-4-0"
     // });
 
-    const llm = new ChatOpenAI({
-      // https://platform.openai.com/docs/pricing
-      // https://platform.openai.com/settings/organization/billing/overview
-      model: "gpt-4o-mini"
-      // model: "o4-mini"
-    });
-
-    // const llm = new ChatGoogleGenerativeAI({
-    //   // https://ai.google.dev/gemini-api/docs/pricing
-    //   // https://console.cloud.google.com/billing
-    //   model: "gemini-2.0-flash"
-    //   // model: "gemini-1.5-pro"
+    // const llm = new ChatOpenAI({
+    //   // https://platform.openai.com/docs/pricing
+    //   // https://platform.openai.com/settings/organization/billing/overview
+    //   model: "gpt-4o-mini"
+    //   // model: "o4-mini"
     // });
+
+    const llm = new ChatGoogleGenerativeAI({
+      // https://ai.google.dev/gemini-api/docs/pricing
+      // https://console.cloud.google.com/billing
+      model: "gemini-2.0-flash"
+      // model: "gemini-1.5-pro"
+    });
 
     const agent = createReactAgent({
       llm,
@@ -182,8 +204,7 @@ export async function test(): Promise<void> {
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
-    // const query = "Tell me the number of directories in the current directory";
-    // const query = "Tell me the number of directories in `.`";
+    // const query = "Tell me how many of directories in `.`";
     const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
@@ -191,6 +212,7 @@ export async function test(): Promise<void> {
     //   "increment the coutns by 1, and show all the items in the DB."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
+    // const query = "Tell me Notion user information"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
