@@ -71,74 +71,135 @@ The widespread nature of this problem is evidenced by numerous libraries attempt
 - **Mastra**: "MCP Tool Compatibility Layer" for multiple providers
 - **Various OpenAI-compatible APIs**: Numerous attempts to create universal interfaces
 
-### Our Solution: Gemini-First Schema Transformation
+### The Severity Problem: Gemini's Hard Failures
 
-Given the incompatibility, we implemented a **provider-specific transformation pipeline**:
+Unlike OpenAI which issues warnings but continues execution, **Gemini terminates with cryptic 400 errors**:
 
-#### 1. Architecture Decision
-```typescript
-// 1. Sanitize for Gemini first (most restrictive)
-processedSchema = sanitizeSchemaForGemini(processedSchema, logger, toolName);
-
-// 2. Add OpenAI compatibility (conditional based on Gemini sanitization)  
-processedSchema = makeJsonSchemaOpenAICompatible(processedSchema, true);
+```
+GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from 
+https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: 
+[400 Bad Request] Unable to submit request because `edit_file` functionDeclaration 
+`parameters.dryRun` schema specified other fields alongside any_of. When using any_of, 
+it must be the only field set.
 ```
 
-#### 2. Gemini Sanitization (Most Critical)
-```typescript
-// CRITICAL: Remove nullable property entirely - Gemini doesn't support it
-if (sanitized.nullable !== undefined) {
-  removedProperties.push("nullable");
-  delete sanitized.nullable;
-}
+**This hard failure makes Gemini the "limiting factor"** - applications simply crash rather than degrading gracefully like with OpenAI.
 
-// Handle anyOf conflicts with other properties
-if (sanitized.anyOf || sanitized.oneOf || sanitized.allOf) {
-  const otherProps = Object.keys(sanitized).filter(key => 
-    key !== unionField && key !== '$schema' && key !== '$id'
-  );
-  
-  if (otherProps.length > 0) {
-    // Create clean schema with ONLY the union
-    const cleanSchema = { [unionField]: unionValue };
-    return cleanSchema;
+### Industry Gap: LangChain's Official Position  
+
+LangChain's official MCP adapters **do not address this compatibility issue**:
+
+#### **LangChain.js MCP Adapters Analysis**
+**Repository**: [langchainjs/libs/langchain-mcp-adapters](https://github.com/langchain-ai/langchainjs/tree/main/libs/langchain-mcp-adapters)  
+**Focus Areas**: Transport management, content handling, authentication  
+**Schema Compatibility**: **Not addressed**
+
+LangChain's adapters focus on:
+- Transport layer abstraction (stdio, SSE, Streamable HTTP)
+- Content block transformations (text, images, etc.)  
+- Authentication and configuration management
+- But **no schema transformations for provider compatibility**
+
+#### **Evidence of Ongoing Issues**
+Active GitHub issues confirm compatibility problems persist:
+- **Issue #8218**: "Using ChatGoogleGenerativeAI with simple tool call under LangGraph ReactAgent throws error"
+- **Community workarounds**: Third-party forks mention "Google's Gemini models require tools to have non-empty parameter schemas"
+
+#### **LangChain's Design Philosophy**
+LangChain appears to take a **"pass-through" approach**:
+- Minimal adapter functionality
+- Raw MCP tool schemas passed directly to LLM providers
+- Compatibility issues left for users to resolve
+
+### Our Solution: Provider-Specific Schema Transformation
+
+Given both the technical incompatibility and the industry gap, we implemented **provider-specific transformations**:
+
+#### 1. Updated Architecture Decision
+```typescript
+if (targetProvider === 'openai') {
+  // Pure OpenAI path: full Structured Outputs support, no warnings
+  processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+} else if (targetProvider === 'gemini') {
+  // Pure Gemini path: full compatibility, prevents 400 errors
+  processedSchema = sanitizeSchemaForGemini(processedSchema);
+} else {
+  // Unknown provider: use Gemini sanitization as safe default
+  // Prevents cryptic termination, ensures broader compatibility
+  processedSchema = sanitizeSchemaForGemini(processedSchema);
+}
+```
+
+#### 2. Gemini Sanitization (Critical for Preventing Crashes)
+```typescript
+function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?: string): any {
+  // CRITICAL: Remove nullable property entirely - Gemini doesn't support it
+  if (sanitized.nullable !== undefined) {
+    removedProperties.push("nullable");
+    delete sanitized.nullable;
   }
-}
-```
 
-#### 3. Conditional OpenAI Compatibility
-```typescript
-function makeJsonSchemaOpenAICompatible(schema: any, isGeminiSanitized = false): any {
-  // Only add nullable properties if NOT pre-sanitized for Gemini
-  if (!required.has(key)) {
-    if (isGeminiSanitized) {
-      // Skip nullable for Gemini compatibility
-    } else {
-      // Add nullable for OpenAI compatibility
-      if (processedProp.type && !processedProp.nullable) {
-        processedProp.nullable = true;
-      }
+  // Handle anyOf conflicts with other properties  
+  if (sanitized.anyOf || sanitized.oneOf || sanitized.allOf) {
+    const otherProps = Object.keys(sanitized).filter(key => 
+      key !== unionField && key !== '$schema' && key !== '$id'
+    );
+    
+    if (otherProps.length > 0) {
+      // Create clean schema with ONLY the union
+      const cleanSchema = { [unionField]: unionValue };
+      return cleanSchema;
     }
   }
 }
 ```
 
-### Results and Trade-offs
-
-#### ✅ Achieved Compatibility
-- **Gemini**: Full compatibility, no errors
-- **OpenAI**: Basic function calling works with warnings
-- **Real-world Impact**: Both providers functional
-
-#### ⚠️ OpenAI Structured Outputs Limitation
-OpenAI displays warnings but continues to work:
+#### 3. OpenAI Optimization (Pure Path)  
+```typescript
+function makeJsonSchemaOpenAICompatible(schema: any): any {
+  // Add nullable properties for OpenAI Structured Outputs
+  if (!required.has(key)) {
+    if (processedProp.type && !processedProp.nullable) {
+      processedProp.nullable = true;
+    } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
+      processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
+    }
+  }
+}
 ```
-Zod field at `#/definitions/edit_file/properties/dryRun` uses `.optional()` 
-without `.nullable()` which is not supported by the API.
+
+### Results and Strategic Value
+
+#### ✅ Solves Critical Production Issues
+- **Gemini**: Full compatibility, **no crashes**
+- **OpenAI**: Optimal schemas, **no warnings**  
+- **Real-world Impact**: Reliable multi-provider deployment
+
+#### ✅ Addresses Industry Gap
+- **LangChain doesn't solve this**: Our library fills a genuine market need
+- **Prevents application crashes**: Eliminates cryptic 400 errors
+- **Production-ready**: Handles provider differences transparently
+
+#### ✅ Strategic Differentiation
+```markdown
+## Why Not Use LangChain's Official MCP Adapters?
+
+LangChain's official adapters provide basic MCP-to-LangChain conversion but don't address 
+LLM provider schema compatibility issues. This library goes further by:
+
+- ✅ **Prevents Gemini crashes** with automatic schema sanitization  
+- ✅ **Optimizes OpenAI schemas** for Structured Outputs without warnings
+- ✅ **Provider-specific transformations** based on each provider's requirements
+- ✅ **Production-ready reliability** across multi-provider deployments
+
+Use this library when you need reliable multi-provider support without compatibility crashes.
 ```
 
-#### 🎯 Industry-Standard Approach
-Our solution aligns with industry best practices identified by Mastra and other compatibility layers.
+#### 🎯 Evidence-Based Approach  
+Our solution is validated by:
+- **Industry research**: Mastra and other compatibility layers use similar approaches
+- **Production testing**: Real-world validation with both providers
+- **Technical analysis**: Deep understanding of each provider's schema requirements
 
 ### Alternative Approaches Considered
 
