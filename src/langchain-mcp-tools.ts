@@ -238,10 +238,31 @@ export async function convertMcpToLangchainTools(
 }
 
 /**
- * Recursively transforms a JSON Schema to be compatible with OpenAI's Structured Outputs requirements.
+ * Transforms a JSON Schema to be compatible with OpenAI's Structured Outputs requirements.
  * 
- * OpenAI requires that all optional fields must also be nullable. This function processes
- * the raw JSON schema before it's converted to Zod, ensuring deep compatibility.
+ * ⚠️  IMPORTANT: This function addresses a core OpenAI API requirement, not a workaround.
+ *     OpenAI's Structured Outputs feature mandates that all optional fields must also be nullable.
+ *     This function processes the raw JSON schema before conversion to Zod, ensuring full compatibility
+ *     with OpenAI models while maintaining compatibility with other LLM providers.
+ * 
+ * OpenAI Structured Outputs requirements:
+ * - All optional fields must be both optional AND nullable
+ * - Fields marked as required can remain non-nullable
+ * - Union types (anyOf/oneOf) must include null type for optional fields
+ * - This applies recursively to all nested objects and schema definitions
+ * 
+ * This function performs deep schema transformation including:
+ * - Object properties with proper nullable handling
+ * - Union types (anyOf/oneOf/allOf) with recursive processing
+ * - Array items and additionalProperties
+ * - Schema definitions and references ($defs/definitions)
+ * 
+ * Reference: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
+ *
+ * @param schema - The JSON schema to transform for OpenAI compatibility
+ * @returns A transformed schema where all optional fields are also nullable
+ * 
+ * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
  */
 function makeJsonSchemaOpenAICompatible(schema: any): any {
   if (typeof schema !== "object" || schema === null) {
