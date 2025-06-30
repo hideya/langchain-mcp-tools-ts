@@ -24,16 +24,16 @@ export async function test(): Promise<void> {
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the others.
 
-  const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
-    "SSE",  "npx -y @h1deya/mcp-server-weather");
+  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
+  //   "SSE",  "npx -y @h1deya/mcp-server-weather");
 
-  // NOTE: without the following line, I got this error:
-  //   ReferenceError: WebSocket is not defined
-  //     at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
-  global.WebSocket = WebSocket as any;
+  // // NOTE: without the following line, I got this error:
+  // //   ReferenceError: WebSocket is not defined
+  // //     at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
+  // global.WebSocket = WebSocket as any;
   
-  const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
-    "WS",  "npx -y @h1deya/mcp-server-weather");
+  // const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
+  //   "WS",  "npx -y @h1deya/mcp-server-weather");
 
   try {
     const mcpServers: McpServersConfig = {
@@ -72,13 +72,13 @@ export async function test(): Promise<void> {
       //   },
       // },
 
-      // weather: {
-      //   command: "npx",
-      //   args: [
-      //     "-y",
-      //    "@h1deya/mcp-server-weather"
-      //   ]
-      // },
+      weather: {
+        command: "npx",
+        args: [
+          "-y",
+         "@h1deya/mcp-server-weather"
+        ]
+      },
       
       // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
       // weather: {
@@ -98,10 +98,10 @@ export async function test(): Promise<void> {
       //   // type: "sse"  // This also works instead of the above
       // },
 
-      weather: {
-        url: `ws://localhost:${wsServerPort}/message`
-        // optionally `transport: "ws"` or `type: "ws"`
-      },
+      // weather: {
+      //   url: `ws://localhost:${wsServerPort}/message`
+      //   // optionally `transport: "ws"` or `type: "ws"`
+      // },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -178,19 +178,19 @@ export async function test(): Promise<void> {
     //   // model: "claude-sonnet-4-0"
     // });
 
-    // const llm = new ChatOpenAI({
-    //   // https://platform.openai.com/docs/pricing
-    //   // https://platform.openai.com/settings/organization/billing/overview
-    //   model: "gpt-4o-mini"
-    //   // model: "o4-mini"
-    // });
-
-    const llm = new ChatGoogleGenerativeAI({
-      // https://ai.google.dev/gemini-api/docs/pricing
-      // https://console.cloud.google.com/billing
-      model: "gemini-2.0-flash"
-      // model: "gemini-1.5-pro"
+    const llm = new ChatOpenAI({
+      // https://platform.openai.com/docs/pricing
+      // https://platform.openai.com/settings/organization/billing/overview
+      model: "gpt-4o-mini"
+      // model: "o4-mini"
     });
+
+    // const llm = new ChatGoogleGenerativeAI({
+    //   // https://ai.google.dev/gemini-api/docs/pricing
+    //   // https://console.cloud.google.com/billing
+    //   model: "gemini-2.0-flash"
+    //   // model: "gemini-1.5-pro"
+    // });
 
     const agent = createReactAgent({
       llm,

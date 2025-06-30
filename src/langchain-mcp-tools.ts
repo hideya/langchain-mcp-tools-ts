@@ -280,9 +280,14 @@ function makeJsonSchemaOpenAICompatible(schema: any): any {
       const processedProp = makeJsonSchemaOpenAICompatible(propSchema);
       
       // If the field is not required, make it nullable
+      // But avoid nullable for fields that already have type + other properties (Gemini compatibility)
       if (!required.has(key)) {
         if (processedProp.type && !processedProp.nullable) {
-          processedProp.nullable = true;
+          // For Gemini compatibility, don't add nullable to fields with default values
+          // as this creates anyOf conflicts when LangChain converts to JSON Schema
+          if (processedProp.default === undefined) {
+            processedProp.nullable = true;
+          }
         } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
           processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
         } else if (processedProp.oneOf && !processedProp.oneOf.some((s: any) => s.type === "null")) {
@@ -370,6 +375,15 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
     return schema;
   }
   
+  // Debug: log when we're processing edit_file specifically
+  if (logger && toolName?.includes('edit_file')) {
+    logger.debug(`MCP tool "${toolName}": Processing schema with keys: ${Object.keys(schema).join(", ")}`);
+    if (schema.anyOf || schema.oneOf || schema.allOf) {
+      const unionField = schema.anyOf ? 'anyOf' : (schema.oneOf ? 'oneOf' : 'allOf');
+      logger.debug(`MCP tool "${toolName}": Found ${unionField} at root level`);
+    }
+  }
+  
   const sanitized = { ...schema };
   const removedProperties: string[] = [];
   const convertedProperties: string[] = [];
@@ -416,6 +430,12 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
     );
     
     if (otherProps.length > 0) {
+      // Debug logging to understand what's happening
+      if (logger && toolName) {
+        logger.warn(`MCP tool "${toolName}": Gemini incompatible schema detected - ${unionField} with other properties: ${otherProps.join(", ")}`);
+        logger.debug(`MCP tool "${toolName}": Original schema keys: ${Object.keys(sanitized).join(", ")}`);
+      }
+      
       removedProperties.push(`other properties alongside ${unionField}: ${otherProps.join(", ")}`);
       
       // Create a clean schema with only the union
@@ -425,6 +445,10 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
       cleanSchema[unionField] = unionValue.map((subSchema: any) => 
         sanitizeSchemaForGemini(subSchema, logger, toolName)
       );
+      
+      if (logger && toolName) {
+        logger.debug(`MCP tool "${toolName}": Cleaned schema keys: ${Object.keys(cleanSchema).join(", ")}`);
+      }
       
       return cleanSchema;
     }
@@ -445,10 +469,16 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
   // Recursively process nested objects and arrays
   if (sanitized.properties) {
     sanitized.properties = Object.fromEntries(
-      Object.entries(sanitized.properties).map(([key, value]) => [
-        key,
-        sanitizeSchemaForGemini(value, logger, toolName)
-      ])
+      Object.entries(sanitized.properties).map(([key, value]) => {
+        // Debug nested properties for edit_file
+        if (logger && toolName?.includes('edit_file') && key === 'dryRun') {
+          logger.debug(`MCP tool "${toolName}": Processing dryRun property:`, JSON.stringify(value, null, 2));
+        }
+        return [
+          key,
+          sanitizeSchemaForGemini(value, logger, toolName ? `${toolName}.${key}` : undefined)
+        ];
+      })
     );
   }
   
@@ -911,19 +941,45 @@ async function convertSingleMcpToLangchainTools(
     const tools = toolsResponse.tools.map((tool) => {
       // Schema transformation pipeline for LLM compatibility:
       // 1. Make OpenAI-compatible at JSON schema level (handles deep nesting)
-      // 2. Sanitize for Gemini (removes unsupported properties)  
+      // 2. Sanitize for Gemini (removes unsupported properties and handles anyOf conflicts)  
       // 3. Convert to Zod schema for LangChain compatibility
       
       let processedSchema = tool.inputSchema;
       
+      // Debug: Log original schema for edit_file
+      if (tool.name === 'edit_file') {
+        logger?.debug(`MCP tool "${serverName}/${tool.name}": Original schema:`, JSON.stringify(processedSchema, null, 2));
+      }
+      
       // Step 1: Deep OpenAI compatibility transformation at JSON schema level
       processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
       
-      // Step 2: Sanitize for Gemini compatibility
+      // Debug: Log after OpenAI processing
+      if (tool.name === 'edit_file') {
+        logger?.debug(`MCP tool "${serverName}/${tool.name}": After OpenAI processing:`, JSON.stringify(processedSchema, null, 2));
+      }
+      
+      // Step 2: Sanitize for Gemini compatibility (now handles anyOf conflicts from OpenAI processing)
       processedSchema = sanitizeSchemaForGemini(processedSchema, logger, `${serverName}/${tool.name}`);
+      
+      // Debug: Log after Gemini sanitization
+      if (tool.name === 'edit_file') {
+        logger?.debug(`MCP tool "${serverName}/${tool.name}": After Gemini sanitization:`, JSON.stringify(processedSchema, null, 2));
+      }
       
       // Step 3: Convert to Zod schema
       let zodSchema = jsonSchemaToZod(processedSchema as JsonSchema) as z.ZodTypeAny;
+      
+      // Debug: Log final schema structure
+      if (tool.name === 'edit_file') {
+        logger?.debug(`MCP tool "${serverName}/${tool.name}": Final Zod schema type:`, zodSchema.constructor.name);
+        try {
+          const zodDef = JSON.stringify(zodSchema._def, null, 2);
+          logger?.debug(`MCP tool "${serverName}/${tool.name}": Final Zod _def:`, zodDef);
+        } catch (e) {
+          logger?.debug(`MCP tool "${serverName}/${tool.name}": Could not stringify Zod _def`);
+        }
+      }
       
       // Ensure we have a ZodObject for DynamicStructuredTool
       const finalSchema = zodSchema instanceof z.ZodObject ? zodSchema : z.object({});
