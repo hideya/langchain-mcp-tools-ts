@@ -238,132 +238,18 @@ export async function convertMcpToLangchainTools(
 }
 
 /**
- * Transforms a JSON Schema to be compatible with OpenAI's Structured Outputs requirements.
- * 
- * ⚠️  IMPORTANT: This function addresses a core OpenAI API requirement, not a workaround.
- *     OpenAI's Structured Outputs feature mandates that all optional fields must also be nullable.
- *     This function processes the raw JSON schema before conversion to Zod, ensuring full compatibility
- *     with OpenAI models while maintaining compatibility with other LLM providers.
- * 
- * OpenAI Structured Outputs requirements:
- * - All optional fields must be both optional AND nullable
- * - Fields marked as required can remain non-nullable
- * - Union types (anyOf/oneOf) must include null type for optional fields
- * - This applies recursively to all nested objects and schema definitions
- * 
- * This function performs deep schema transformation including:
- * - Object properties with proper nullable handling
- * - Union types (anyOf/oneOf/allOf) with recursive processing
- * - Array items and additionalProperties
- * - Schema definitions and references ($defs/definitions)
- * 
- * Reference: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
- *
- * @param schema - The JSON schema to transform for OpenAI compatibility
- * @returns A transformed schema where all optional fields are also nullable
- * 
- * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
- */
-function makeJsonSchemaOpenAICompatible(schema: any): any {
-  if (typeof schema !== "object" || schema === null) {
-    return schema;
-  }
-
-  const result = { ...schema };
-
-  // Handle object properties
-  if (result.properties) {
-    const processedProperties: Record<string, any> = {};
-    const required = new Set(result.required || []);
-
-    for (const [key, propSchema] of Object.entries(result.properties)) {
-      const processedProp = makeJsonSchemaOpenAICompatible(propSchema);
-      
-      // If the field is not required, make it nullable
-      if (!required.has(key)) {
-        if (processedProp.type && !processedProp.nullable) {
-          processedProp.nullable = true;
-        } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
-          processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
-        } else if (processedProp.oneOf && !processedProp.oneOf.some((s: any) => s.type === "null")) {
-          processedProp.oneOf = [...processedProp.oneOf, { type: "null" }];
-        }
-      }
-      
-      processedProperties[key] = processedProp;
-    }
-    
-    result.properties = processedProperties;
-  }
-
-  // Handle anyOf/oneOf/allOf recursively
-  if (result.anyOf) {
-    result.anyOf = result.anyOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
-  }
-  
-  if (result.oneOf) {
-    result.oneOf = result.oneOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
-  }
-  
-  if (result.allOf) {
-    result.allOf = result.allOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema));
-  }
-
-  // Handle array items
-  if (result.items) {
-    if (Array.isArray(result.items)) {
-      result.items = result.items.map(makeJsonSchemaOpenAICompatible);
-    } else {
-      result.items = makeJsonSchemaOpenAICompatible(result.items);
-    }
-  }
-
-  // Handle additionalProperties
-  if (result.additionalProperties && typeof result.additionalProperties === "object") {
-    result.additionalProperties = makeJsonSchemaOpenAICompatible(result.additionalProperties);
-  }
-
-  // Handle definitions (common in complex schemas)
-  if (result.definitions || result.$defs) {
-    const defsKey = result.definitions ? 'definitions' : '$defs';
-    const processedDefs: Record<string, any> = {};
-    
-    for (const [key, defSchema] of Object.entries(result[defsKey])) {
-      processedDefs[key] = makeJsonSchemaOpenAICompatible(defSchema);
-    }
-    
-    result[defsKey] = processedDefs;
-  }
-
-  return result;
-}
-
-/**
  * Sanitizes a JSON Schema to make it compatible with Google Gemini API.
  * 
- * ⚠️  IMPORTANT: This is a temporary workaround to keep applications running.
- *     The underlying schema compatibility issues should be fixed on the MCP server side
- *     for proper Google LLM compatibility. This function will log warnings when
- *     performing schema conversions to help track which servers need upstream fixes.
+ * Gemini has strict limitations and does NOT support:
+ * - The `nullable` property at all
+ * - `anyOf`/`oneOf`/`allOf` alongside other properties  
+ * - Most string formats except "enum" and "date-time"
+ * - `exclusiveMinimum`/`exclusiveMaximum`
  * 
- * Gemini supports only a limited subset of OpenAPI 3.0 Schema properties:
- * - string: enum, format (only "date-time" documented)  
- * - integer/number: format only
- * - array: minItems, maxItems, items
- * - object: properties, required, propertyOrdering, nullable
- * 
- * This function removes known problematic properties while preserving
- * as much validation as possible. When debug logging is enabled,
- * it reports what schema changes were made for transparency.
- * 
- * Reference: https://ai.google.dev/gemini-api/docs/structured-output#json-schemas
- *
  * @param schema - The JSON schema to sanitize
  * @param logger - Optional logger for reporting sanitization actions
  * @param toolName - Optional tool name for logging context
- * @returns A sanitized schema compatible with all major LLM providers
- * 
- * @internal This function is meant to be used internally by convertSingleMcpToLangchainTools
+ * @returns A sanitized schema compatible with Gemini
  */
 function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?: string): any {
   if (typeof schema !== "object" || schema === null) {
@@ -373,6 +259,12 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
   const sanitized = { ...schema };
   const removedProperties: string[] = [];
   const convertedProperties: string[] = [];
+  
+  // CRITICAL: Remove nullable property entirely - Gemini doesn't support it at all
+  if (sanitized.nullable !== undefined) {
+    removedProperties.push("nullable");
+    delete sanitized.nullable;
+  }
   
   // Remove unsupported properties
   if (sanitized.exclusiveMinimum !== undefined) {
@@ -473,6 +365,97 @@ function sanitizeSchemaForGemini(schema: any, logger?: McpToolsLogger, toolName?
   }
   
   return sanitized;
+}
+
+/**
+ * Transforms a JSON Schema to be compatible with OpenAI's Structured Outputs requirements.
+ * 
+ * For Gemini compatibility, this function now avoids using `nullable` properties since
+ * Gemini doesn't support them. Instead, it uses `anyOf` with null types only when 
+ * the schema will be used with OpenAI (detected by absence of prior Gemini sanitization).
+ * 
+ * @param schema - The JSON schema to transform for OpenAI compatibility
+ * @param isGeminiSanitized - Whether this schema has already been sanitized for Gemini
+ * @returns A transformed schema where all optional fields are also nullable
+ */
+function makeJsonSchemaOpenAICompatible(schema: any, isGeminiSanitized = false): any {
+  if (typeof schema !== "object" || schema === null) {
+    return schema;
+  }
+
+  const result = { ...schema };
+
+  // Handle object properties
+  if (result.properties) {
+    const processedProperties: Record<string, any> = {};
+    const required = new Set(result.required || []);
+
+    for (const [key, propSchema] of Object.entries(result.properties)) {
+      const processedProp = makeJsonSchemaOpenAICompatible(propSchema, isGeminiSanitized);
+      
+      // If the field is not required, make it nullable
+      if (!required.has(key)) {
+        if (isGeminiSanitized) {
+          // For Gemini: Don't add nullable, it's already been removed
+          // Gemini will handle optional fields automatically
+        } else {
+          // For OpenAI: Add nullability as before
+          if (processedProp.type && !processedProp.nullable) {
+            processedProp.nullable = true;
+          } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
+            processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
+          } else if (processedProp.oneOf && !processedProp.oneOf.some((s: any) => s.type === "null")) {
+            processedProp.oneOf = [...processedProp.oneOf, { type: "null" }];
+          }
+        }
+      }
+      
+      processedProperties[key] = processedProp;
+    }
+    
+    result.properties = processedProperties;
+  }
+
+  // Handle anyOf/oneOf/allOf recursively
+  if (result.anyOf) {
+    result.anyOf = result.anyOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema, isGeminiSanitized));
+  }
+  
+  if (result.oneOf) {
+    result.oneOf = result.oneOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema, isGeminiSanitized));
+  }
+  
+  if (result.allOf) {
+    result.allOf = result.allOf.map((subSchema: any) => makeJsonSchemaOpenAICompatible(subSchema, isGeminiSanitized));
+  }
+
+  // Handle array items
+  if (result.items) {
+    if (Array.isArray(result.items)) {
+      result.items = result.items.map((item: any) => makeJsonSchemaOpenAICompatible(item, isGeminiSanitized));
+    } else {
+      result.items = makeJsonSchemaOpenAICompatible(result.items, isGeminiSanitized);
+    }
+  }
+
+  // Handle additionalProperties
+  if (result.additionalProperties && typeof result.additionalProperties === "object") {
+    result.additionalProperties = makeJsonSchemaOpenAICompatible(result.additionalProperties, isGeminiSanitized);
+  }
+
+  // Handle definitions (common in complex schemas)
+  if (result.definitions || result.$defs) {
+    const defsKey = result.definitions ? 'definitions' : '$defs';
+    const processedDefs: Record<string, any> = {};
+    
+    for (const [key, defSchema] of Object.entries(result[defsKey])) {
+      processedDefs[key] = makeJsonSchemaOpenAICompatible(defSchema, isGeminiSanitized);
+    }
+    
+    result[defsKey] = processedDefs;
+  }
+
+  return result;
 }
 
 /**
@@ -911,59 +894,65 @@ async function convertSingleMcpToLangchainTools(
     const tools = toolsResponse.tools.map((tool) => {
       // 1. Start with original MCP schema
       let processedSchema = tool.inputSchema;
-      
-      // DEBUG: Log the original schema for the problematic tool
-      if (tool.name === 'edit_file') {
-        console.log(`\n=== ORIGINAL SCHEMA for ${tool.name} ===`);
-        console.log(JSON.stringify(processedSchema, null, 2));
-        
-        // Look specifically at the dryRun parameter
-        if (processedSchema.properties?.dryRun) {
-          console.log(`\n=== dryRun parameter ===`);
-          console.log(JSON.stringify(processedSchema.properties.dryRun, null, 2));
-        }
-      }
 
-      // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues)
+      // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues, removes nullable)
       processedSchema = sanitizeSchemaForGemini(processedSchema, logger, `${serverName}/${tool.name}`);
 
-      // DEBUG: Log after Gemini sanitization
-      if (tool.name === 'edit_file') {
-        console.log(`\n=== AFTER GEMINI SANITIZATION ===`);
-        console.log(JSON.stringify(processedSchema, null, 2));
-        
-        // Look specifically at the dryRun parameter
-        if (processedSchema.properties?.dryRun) {
-          console.log(`\n=== dryRun parameter after Gemini ===`);
-          console.log(JSON.stringify(processedSchema.properties.dryRun, null, 2));
-        }
-      }
+      // 3. THEN: Add OpenAI nullability (but skip nullable properties for Gemini compatibility)
+      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema, true); // true = isGeminiSanitized
 
-      // 3. THEN: Add OpenAI nullability (works on the already-clean schema)
-      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
-
-      // DEBUG: Log final schema
-      if (tool.name === 'edit_file') {
-        console.log(`\n=== FINAL SCHEMA ===`);
-        console.log(JSON.stringify(processedSchema, null, 2));
-        
-        // Look specifically at the dryRun parameter
-        if (processedSchema.properties?.dryRun) {
-          console.log(`\n=== dryRun parameter FINAL ===`);
-          console.log(JSON.stringify(processedSchema.properties.dryRun, null, 2));
-        }
-      }
-
-      // Rest of your code...
+      // 4. Convert to Zod
       let zodSchema = jsonSchemaToZod(processedSchema as JsonSchema) as z.ZodTypeAny;
+      
+      // Ensure we have a ZodObject for DynamicStructuredTool
       const finalSchema = zodSchema instanceof z.ZodObject ? zodSchema : z.object({});
       
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
         schema: finalSchema,
+
         func: async function(input) {
-          // ... your existing func implementation
+          logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
+
+          try {
+            // Execute tool call
+            const result = await client?.request(
+              {
+                method: "tools/call",
+                params: {
+                  name: tool.name,
+                  arguments: input,
+                },
+              },
+              CallToolResultSchema
+            );
+
+            // Handles null/undefined cases gracefully
+            if (!result?.content) {
+              logger.info(`MCP tool "${serverName}"/"${tool.name}" received null/undefined result`);
+              return "";
+            }
+
+            // Extract text content from tool results
+            // MCP tools can return multiple content types, but this library currently uses
+            // LangChain's 'content' response format which only supports text strings
+            const textContent = result.content
+              .filter(content => content.type === "text")
+              .map(content => content.text)
+              .join("\n\n");
+
+            // Log rough result size for monitoring
+            const size = new TextEncoder().encode(textContent).length
+            logger.info(`MCP tool "${serverName}"/"${tool.name}" received result (size: ${size})`);
+
+            // If no text content, return a clear message describing the situation
+            return textContent || "No text content available in response";
+
+          } catch (error: unknown) {
+              logger.warn(`MCP tool "${serverName}"/"${tool.name}" caused error: ${error}`);
+              return `Error executing MCP tool: ${error}`;
+          }
         },
       });
     });
