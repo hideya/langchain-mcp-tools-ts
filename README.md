@@ -1,4 +1,4 @@
-# MCP to LangChain Tools Conversion Library / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools)
+# MCP to LangChain Tools Conversion Utility / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools) [![network dependents](https://dependents.info/hideya/langchain-mcp-tools-ts/badge)](https://dependents.info/hideya/langchain-mcp-tools-ts)
 
 A simple, lightweight library intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
