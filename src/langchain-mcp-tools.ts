@@ -687,11 +687,12 @@ async function convertSingleMcpToLangchainTools(
       }
       let processedSchema = result.schema;
 
+      const zodSchema = jsonSchemaToZod(processedSchema);
       
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
-        schema: processedSchema,
+        schema: zodSchema,
 
         func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
@@ -722,6 +723,12 @@ async function convertSingleMcpToLangchainTools(
               .filter(content => content.type === "text")
               .map(content => content.text)
               .join("\n\n");
+
+            // Alternative approach using JSON serialization (preserved for reference):
+            // const textItems = result.content
+            //   .filter(content => content.type === "text")
+            //   .map(content => content.text)
+            // const textContent = JSON.stringify(textItems);
 
             // Log rough result size for monitoring
             const size = new TextEncoder().encode(textContent).length
