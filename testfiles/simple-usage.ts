@@ -4,6 +4,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
+import { isInteropZodSchema } from "@langchain/core/utils/types";
 import WebSocket from 'ws';
 import * as fs from "fs";
 
@@ -14,9 +15,14 @@ import {
   McpToolsLogger
 } from "../src/langchain-mcp-tools";
 import { LogLevel } from "../src/logger";
+import { applyOpenAIIntegrationFix } from "../src/openai-integration-fix";
 import { startRemoteMcpServerLocally } from "./remote-server-utils";
 
 export async function test(): Promise<void> {
+  // IMPORTANT: Apply the OpenAI integration fix before using OpenAI models
+  // Uncomment the next line to fix the "Cannot read properties of undefined (reading 'typeName')" error
+  // applyOpenAIIntegrationFix();
+  
   let mcpCleanup: McpServerCleanupFn | undefined;
   const openedLogFiles: { [serverName: string]: number } = {};
 
@@ -37,24 +43,24 @@ export async function test(): Promise<void> {
 
   try {
     const mcpServers: McpServersConfig = {
-      filesystem: {
-        // transport: "stdio",  // optional
-        // type: "stdio",  // optional: VSCode-style config works too
-        command: "npx",
-        args: [
-          "-y",
-          "@modelcontextprotocol/server-filesystem",
-          "."  // path to a directory to allow access to
-        ],
-        // cwd: "/tmp"  // the working directory to be use by the server
-      },
+      // filesystem: {
+      //   // transport: "stdio",  // optional
+      //   // type: "stdio",  // optional: VSCode-style config works too
+      //   command: "npx",
+      //   args: [
+      //     "-y",
+      //     "@modelcontextprotocol/server-filesystem",
+      //     "."  // path to a directory to allow access to
+      //   ],
+      //   // cwd: "/tmp"  // the working directory to be use by the server
+      // },
 
-      fetch: {
-        command: "uvx",
-        args: [
-          "mcp-server-fetch"
-        ]
-      },
+      // fetch: {
+      //   command: "uvx",
+      //   args: [
+      //     "mcp-server-fetch"
+      //   ]
+      // },
 
       weather: {
         command: "npx",
@@ -95,13 +101,13 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      notion: {
-        "command": "npx",
-        "args": ["-y", "@notionhq/notion-mcp-server"],
-        "env": {
-          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-        },
-      },
+      // notion: {
+      //   "command": "npx",
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "env": {
+      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+      //   },
+      // },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -193,10 +199,84 @@ export async function test(): Promise<void> {
     //   // model: "gemini-2.5-pro"
     // });
 
+    // DEBUGGING: Let's test isZodSchemaV3 directly on our clean schemas
+    console.log('\n=== DIRECT isZodSchemaV3 TESTING ===');
+    
+    const { isZodSchemaV3 } = await import('@langchain/core/utils/types');
+    
+    tools.forEach((tool, index) => {
+      console.log(`\nTesting tool ${index}: ${tool.name}`);
+      const schema = tool.schema;
+      
+      console.log('Schema type:', typeof schema);
+      console.log('Schema constructor:', schema?.constructor?.name);
+      console.log('isInteropZodSchema:', isInteropZodSchema(schema));
+      
+      // Test isZodSchemaV3 step by step
+      console.log('\n--- isZodSchemaV3 step-by-step ---');
+      console.log('1. typeof schema === "object":', typeof schema === 'object');
+      console.log('2. schema !== null:', schema !== null);
+      
+      if (typeof schema === 'object' && schema !== null) {
+        const obj = schema as Record<string, unknown>;
+        console.log('3. "_def" in obj:', '_def' in obj);
+        console.log('4. "_zod" in obj:', '_zod' in obj);
+        console.log('5. !"_zod" in obj:', !('_zod' in obj));
+        
+        const hasDefNotZod = '_def' in obj && !('_zod' in obj);
+        console.log('6. hasDefNotZod:', hasDefNotZod);
+        
+        if (hasDefNotZod) {
+          const def = obj._def;
+          console.log('7. _def type:', typeof def);
+          console.log('8. _def !== null:', def !== null);
+          
+          if (typeof def === 'object' && def !== null) {
+            console.log('9. "typeName" in def:', 'typeName' in def);
+            console.log('10. _def.typeName:', (def as any).typeName);
+          }
+        }
+      }
+      
+      const result = isZodSchemaV3(schema);
+      console.log('\nFINAL isZodSchemaV3 result:', result);
+      console.log('--- end step-by-step ---');
+    });
+    
+    console.log('\n=== END DIRECT TESTING ===\n');
+
     const agent = createReactAgent({
       llm,
       tools
     });
+
+    // DEBUG: Let's inspect the tools before they get passed to bindTools
+    console.log("\n=== DEBUG: Tools being passed to agent ===");
+    tools.forEach((tool, index) => {
+      console.log(`Tool ${index}: ${tool.name}`);
+      console.log(`  Schema type: ${typeof tool.schema}`);
+      console.log(`  Schema:`, JSON.stringify(tool.schema, null, 2));
+      console.log(`  isInteropZodSchema: ${isInteropZodSchema(tool.schema)}`);
+      
+      // Check the exact condition from isZodSchemaV3
+      const schema = tool.schema;
+      if (typeof schema === 'object' && schema !== null) {
+        const hasDefNotZod = '_def' in schema && !('_zod' in schema);
+        console.log(`  Has _def but not _zod: ${hasDefNotZod}`);
+        if (hasDefNotZod) {
+          const def = (schema as any)._def;
+          console.log(`  _def type: ${typeof def}`);
+          if (typeof def === 'object' && def !== null) {
+            console.log(`  _def has typeName: ${'typeName' in def}`);
+            if ('typeName' in def) {
+              console.log(`  _def.typeName: ${def.typeName}`);
+            }
+          }
+        }
+      }
+      console.log('---');
+    });
+    console.log("=== END DEBUG ===");
 
     console.log("\x1b[32m");  // color to green
     console.log("\nLLM model:", llm.constructor.name, llm.model);
@@ -204,9 +284,9 @@ export async function test(): Promise<void> {
 
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
-    const query = "Read and briefly summarize the LICENSE file";
+    // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me how many of directories in `.`";
-    // const query = "Are there any weather alerts in California?";
+    const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +

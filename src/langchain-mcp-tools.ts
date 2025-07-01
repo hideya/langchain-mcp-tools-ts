@@ -14,8 +14,9 @@ import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotoc
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod } from "@h1deya/json-schema-to-zod";
 import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
-import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
+import { makeJsonSchemaOpenAICompatible, diagnoseZodDetection } from "./schema-adapter-openai.js";
 import { Logger } from "./logger.js";
+import { isInteropZodSchema } from "@langchain/core/utils/types";
 
 
 /**
@@ -686,14 +687,37 @@ async function convertSingleMcpToLangchainTools(
         logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for OpenAI: ", result.changesSummary);
       }
       let processedSchema = result.schema;
+      
+      // Diagnostic: Check if the processed schema might still trigger Zod detection
+      const zodIssues = diagnoseZodDetection(processedSchema);
+      if (zodIssues.length > 0) {
+        logger.warn(`MCP server "${serverName}/${tool.name}" - Potential Zod detection issues:`, zodIssues);
+      }
+      
+      // DEBUG: Log the actual schema being passed to DynamicStructuredTool
+      logger.debug(`MCP server "${serverName}/${tool.name}" - Final schema:`, JSON.stringify(processedSchema, null, 2));
+      
+      // DEBUG: Check if LangChain's detection functions work correctly
+      const isDetectedAsZod = isInteropZodSchema(processedSchema);
+      logger.debug(`MCP server "${serverName}/${tool.name}" - Detected as Zod schema: ${isDetectedAsZod}`);
 
+      // WORKAROUND: Convert JSON schema to Zod to avoid LangChain OpenAI integration bug
+      // This fixes the "Cannot read properties of undefined (reading 'typeName')" error
       // const zodSchema = jsonSchemaToZod(processedSchema);
+      
+      // DEBUG: Let's test the exact isZodSchemaV3 condition here too
+      logger.debug(`MCP server "${serverName}/${tool.name}" - About to create DynamicStructuredTool`);
+      const hasDefNotZod = '_def' in processedSchema && !('_zod' in processedSchema);
+      if (hasDefNotZod) {
+        logger.warn(`MCP server "${serverName}/${tool.name}" - CRITICAL: Schema has _def but not _zod!`);
+        logger.warn(`_def content:`, JSON.stringify((processedSchema as any)._def, null, 2));
+      }
 
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
-        // schema: zodSchema,
-        schema: processedSchema,
+        // schema: zodSchema,  // Use Zod schema to avoid OpenAI integration bug
+        schema: processedSchema,  // Let's reproduce the error to debug it
 
         func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);

@@ -94,7 +94,7 @@ function removeZodArtifacts(
   // Deep clone to avoid mutating the original
   const cleaned = JSON.parse(JSON.stringify(schema));
   
-  function cleanObject(obj: any): void {
+  function cleanObject(obj: any, path: string = ''): void {
     if (typeof obj !== 'object' || obj === null) return;
     
     // Remove Zod-specific properties that can confuse LangChain's schema detection
@@ -103,6 +103,7 @@ function removeZodArtifacts(
     
     for (const prop of zodProps) {
       if (prop in obj) {
+        console.log(`[DEBUG] Removing Zod property '${prop}' at path: ${path || 'root'}`);
         delete obj[prop];
         removedAny = true;
       }
@@ -114,9 +115,11 @@ function removeZodArtifacts(
     
     // Recursively process nested objects/arrays
     if (Array.isArray(obj)) {
-      obj.forEach(cleanObject);
+      obj.forEach((item, index) => cleanObject(item, `${path}[${index}]`));
     } else {
-      Object.values(obj).forEach(cleanObject);
+      Object.entries(obj).forEach(([key, value]) => {
+        cleanObject(value, path ? `${path}.${key}` : key);
+      });
     }
   }
   
@@ -393,6 +396,49 @@ export function transformMcpToolForOpenAI(mcpTool: any) {
     wasTransformed: transformResult.wasTransformed,
     changesSummary: transformResult.changesSummary
   };
+}
+
+/**
+ * Diagnostic function to check what might trigger LangChain's isZodSchemaV3 detection
+ */
+export function diagnoseZodDetection(schema: any, path = ''): string[] {
+  const issues: string[] = [];
+  
+  function checkObject(obj: any, currentPath: string): void {
+    if (typeof obj !== 'object' || obj === null) return;
+    
+    // Check for properties that might trigger false positive
+    if ('_def' in obj) {
+      issues.push(`Found '_def' property at ${currentPath}`);
+    }
+    if ('_zod' in obj) {
+      issues.push(`Found '_zod' property at ${currentPath}`);
+    }
+    
+    // Check the specific condition from isZodSchemaV3
+    if ('_def' in obj && !('_zod' in obj)) {
+      const def = obj._def;
+      if (typeof def === 'object' && def !== null && 'typeName' in def) {
+        issues.push(`CRITICAL: Found Zod v3 pattern at ${currentPath} (has _def.typeName)`);
+      } else if (typeof def === 'object' && def !== null) {
+        issues.push(`Found _def without typeName at ${currentPath}`);
+      }
+    }
+    
+    // Recursively check
+    if (Array.isArray(obj)) {
+      obj.forEach((item, index) => {
+        checkObject(item, `${currentPath}[${index}]`);
+      });
+    } else {
+      Object.entries(obj).forEach(([key, value]) => {
+        checkObject(value, currentPath ? `${currentPath}.${key}` : key);
+      });
+    }
+  }
+  
+  checkObject(schema, path || 'root');
+  return issues;
 }
 
 /**

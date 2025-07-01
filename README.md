@@ -351,6 +351,10 @@ The library automatically handles schema compatibility for different LLM provide
   Makes optional fields nullable as required by OpenAI's strict specification.
   Most MCP servers use standard JSON Schema practices (optional fields without explicit nullable),
   so this transformation is applied automatically without logging.
+  
+  **⚠️ Known Issue with OpenAI Models**: There is a bug in the LangChain OpenAI integration that causes
+  the error `TypeError: Cannot read properties of undefined (reading 'typeName')` when using
+  `DynamicStructuredTool` with JSON schemas. See [OpenAI Integration Fix](#openai-integration-fix) below.
 
 - **Google Gemini**:
   Sanitizes schemas to remove unsupported properties like `exclusiveMinimum` and unsupported string formats.
@@ -363,6 +367,40 @@ The library automatically handles schema compatibility for different LLM provide
 
 The library handles these compatibility requirements transparently,
 allowing you to use existing MCP servers with any supported LLM provider without modification.
+
+### OpenAI Integration Fix
+
+When using OpenAI models (`ChatOpenAI`) with this library, you may encounter this error:
+
+```
+TypeError: Cannot read properties of undefined (reading 'typeName')
+    at parseDef (...node_modules/openai/src/_vendor/zod-to-json-schema/parseDef.ts:102:53)
+    ...
+```
+
+This is due to a bug in the LangChain OpenAI integration where it incorrectly tries to process JSON schemas as Zod schemas.
+
+**Solution**: Apply the integration fix before creating OpenAI models:
+
+```ts
+import { applyOpenAIIntegrationFix } from "@h1deya/langchain-mcp-tools";
+
+// Apply the fix BEFORE creating any OpenAI models or agents
+applyOpenAIIntegrationFix();
+
+// Now you can use OpenAI models safely
+const llm = new ChatOpenAI({ model: "gpt-4" });
+const agent = createReactAgent({ llm, tools });
+```
+
+**Testing the fix**:
+```bash
+npm run demo:openai-bug  # Demonstrates the bug and shows the fix working
+```
+
+For detailed information about this issue, see [OPENAI_FIX.md](OPENAI_FIX.md).
+
+**Alternative workaround**: Convert JSON schemas to Zod schemas using the `jsonSchemaToZod` utility if you prefer not to use the monkey patch.
 
 ### Resource Management
 
