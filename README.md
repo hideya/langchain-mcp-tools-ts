@@ -4,16 +4,12 @@ A simple, lightweight library intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools with LangChain.
 
-Its simplicity and extra features for stdio MCP servers can make it useful as a basis for your own customizations.
+Its simplicity and extra features for stdio MCP servers can make it useful as a basis for your own customizations.  
 However, it only supports text results of tool calls and does not support MCP features other than tools.
 
 [LangChain's **official LangChain.js MCP Adapters** library](https://www.npmjs.com/package/@langchain/mcp-adapters),
 which supports comprehensive integration with LangChain, has been released.
 You may want to consider using it if you don't have specific needs for this library.
-
-<a href="https://dependents.info/hideya/langchain-mcp-tools-ts">
-  <img src="https://dependents.info/hideya/langchain-mcp-tools-ts/image.svg" width="400px"/>
-</a>
 
 ## Introduction
 
@@ -101,8 +97,8 @@ to be invoked to close all MCP server sessions when finished.
 The returned tools can be used with LangChain, e.g.:
 
 ```ts
-// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-const llm = new ChatGoogleGenerativeAI({ model: "gemini-2.0-flash" })
+// import { ChatAnthropic } from "@langchain/anthropic";
+const llm = new ChatAnthropic({ model: "claude-3-5-haiku-latest" });
 
 // import { createReactAgent } from "@langchain/langgraph/prebuilt";
 const agent = createReactAgent({
