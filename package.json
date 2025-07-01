@@ -50,6 +50,7 @@
     "example:simple": "tsx testfiles/simple-usage.ts",
     "example:openai-adapter": "tsx testfiles/openai-adapter-example.ts",
     "example:openai-fix": "tsx testfiles/test-with-fix.ts",
+    "example:openai-helper": "tsx testfiles/test-compatibility-helper.ts",
     "demo:openai-bug": "tsx testfiles/bug-demo.ts",
     "demo:openai-bug-fixed": "tsx testfiles/bug-demo-fixed.ts",
     "investigate:openai": "tsx testfiles/comprehensive-investigation.ts",

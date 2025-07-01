@@ -44,8 +44,9 @@ function fixedConvertToOpenAITool(
     if (isZodSchema) {
       // For actual Zod schemas, try to use OpenAI's zodFunction if available
       try {
-        const zodFunctionModule = eval('require("openai/helpers/zod")');
-        const zodFunction = zodFunctionModule.zodFunction;
+        // Dynamic import to avoid ES module issues
+        const openaiModule = await import("openai/helpers/zod");
+        const zodFunction = openaiModule.zodFunction;
         
         if (zodFunction) {
           const oaiToolDef = zodFunction({
@@ -102,6 +103,9 @@ function fixedConvertToOpenAITool(
   return toolDef;
 }
 
+// Store original function for restoration
+let originalFunction: any = null;
+
 /**
  * Applies the monkey patch to fix the LangChain OpenAI integration bug.
  * Call this before using OpenAI models with DynamicStructuredTool.
@@ -115,24 +119,21 @@ function fixedConvertToOpenAITool(
  * const llm = new ChatOpenAI({ model: "gpt-4" });
  * const agent = createReactAgent({ llm, tools });
  */
-export function applyOpenAIIntegrationFix(): void {
+export async function applyOpenAIIntegrationFix(): Promise<void> {
   try {
+    console.log("🔧 Applying OpenAI integration fix...");
+    
     // Use dynamic import for ES modules compatibility
-    const openaiUtilsModule = eval('require("@langchain/openai/dist/utils/tools.js")');
+    const openaiUtilsModule = await import("@langchain/openai/dist/utils/tools.js");
     
     if (openaiUtilsModule && openaiUtilsModule._convertToOpenAITool) {
-      console.log("🔧 Applying OpenAI integration fix...");
-      
-      // Store the original function for debugging
-      const originalFunction = openaiUtilsModule._convertToOpenAITool;
+      // Store the original function for potential restoration
+      originalFunction = openaiUtilsModule._convertToOpenAITool;
       
       // Replace with our fixed version
-      openaiUtilsModule._convertToOpenAITool = fixedConvertToOpenAITool;
+      (openaiUtilsModule as any)._convertToOpenAITool = fixedConvertToOpenAITool;
       
       console.log("✅ OpenAI integration fix applied successfully!");
-      
-      // Store reference to original for potential restoration
-      (fixedConvertToOpenAITool as any).__original = originalFunction;
     } else {
       console.warn("⚠️  Could not find _convertToOpenAITool to patch - module structure may have changed");
     }
@@ -145,13 +146,12 @@ export function applyOpenAIIntegrationFix(): void {
  * Removes the monkey patch and restores the original function.
  * Useful for testing or if you want to revert the fix.
  */
-export function removeOpenAIIntegrationFix(): void {
+export async function removeOpenAIIntegrationFix(): Promise<void> {
   try {
-    const openaiUtilsModule = eval('require("@langchain/openai/dist/utils/tools.js")');
-    const fixedFunction = openaiUtilsModule._convertToOpenAITool;
-    
-    if (fixedFunction && (fixedFunction as any).__original) {
-      openaiUtilsModule._convertToOpenAITool = (fixedFunction as any).__original;
+    if (originalFunction) {
+      const openaiUtilsModule = await import("@langchain/openai/dist/utils/tools.js");
+      (openaiUtilsModule as any)._convertToOpenAITool = originalFunction;
+      originalFunction = null;
       console.log("🔄 OpenAI integration fix removed - restored original function");
     } else {
       console.warn("⚠️  No fix to remove or original function not found");
