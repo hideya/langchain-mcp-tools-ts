@@ -1,6 +1,18 @@
 /**
  * Transforms a JSON Schema to be compatible with Gemini's OpenAPI 3.0 subset
  * Used for converting MCP tool schemas to Gemini function declarations
+ * 
+ * The changes are mostly cosmetic/validation-level and shouldn't break core
+ * tool functionality:
+ * - Core parameter structure is preserved
+ * - Required fields are maintained
+ * - Basic types are converted accurately
+ * 
+ * For the OpenAPI subset requirement for function declarations
+ *    see: https://ai.google.dev/api/caching#Schema
+ * 
+ * For the OpenAPI 3.0 subset limitations vs full JSON Schema
+ *    see: https://ai.google.dev/gemini-api/docs/structured-output
  */
 
 interface JsonSchema {
@@ -79,12 +91,33 @@ export function makeJsonSchemaGeminiCompatible(
 
   // Copy basic supported fields
   if (schema.description) result.description = schema.description;
-  if (schema.format) result.format = schema.format;
   if (schema.enum) result.enum = schema.enum;
   if (schema.nullable !== undefined) result.nullable = schema.nullable;
   if (schema.example !== undefined) result.example = schema.example;
   if (schema.default !== undefined) result.default = schema.default;
   if (schema.pattern) result.pattern = schema.pattern;
+
+  // Handle format field - filter unsupported formats
+  if (schema.format) {
+    if (result.type === 'string') {
+      // Only allow supported string formats for Gemini
+      if (['enum', 'date-time'].includes(schema.format)) {
+        result.format = schema.format;
+      }
+      // Drop unsupported string formats (uri, uuid, url, email, etc.)
+    } else if (result.type === 'number') {
+      // Only allow supported number formats
+      if (['float', 'double'].includes(schema.format)) {
+        result.format = schema.format;
+      }
+    } else if (result.type === 'integer') {
+      // Only allow supported integer formats
+      if (['int32', 'int64'].includes(schema.format)) {
+        result.format = schema.format;
+      }
+    }
+    // For other types, don't set format
+  }
 
   // Handle numeric constraints - convert exclusive to inclusive
   if (typeof schema.minimum === 'number') {
