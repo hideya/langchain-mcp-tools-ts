@@ -13,7 +13,7 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
-import { z } from "zod";
+import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
 import { Logger } from "./logger.js";
 
 
@@ -235,14 +235,6 @@ export async function convertMcpToLangchainTools(
   allTools.forEach((tool) => logger.debug(`- ${tool.name}`));
 
   return { tools: allTools, cleanup };
-}
-
-function makeJsonSchemaGeminiCompatible(schema: any, logger?: McpToolsLogger, toolName?: string): any {
-  return schema;
-}
-
-function makeJsonSchemaOpenAICompatible(schema: any, logger?: McpToolsLogger, toolName?: string): any {
-  return schema;
 }
 
 /**
@@ -679,13 +671,8 @@ async function convertSingleMcpToLangchainTools(
     );
 
     const tools = toolsResponse.tools.map((tool) => {
-      // 1. Start with original MCP schema
-      let processedSchema = tool.inputSchema;
+      let processedSchema = makeJsonSchemaGeminiCompatible(tool.inputSchema);
 
-      // 2. FIRST: Sanitize for Gemini (removes conflicts, cleans up anyOf issues, removes nullable)
-      processedSchema = makeJsonSchemaGeminiCompatible(processedSchema, logger, `${serverName}/${tool.name}`);
-
-      // 3. THEN: Add OpenAI nullability (but skip nullable properties for Gemini compatibility)
       // processedSchema = makeJsonSchemaOpenAICompatible(processedSchema, logger, `${serverName}/${tool.name}`);
       
       return new DynamicStructuredTool({
