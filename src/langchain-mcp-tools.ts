@@ -12,8 +12,8 @@ import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/webso
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
+import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
 import { Logger } from "./logger.js";
 
 
@@ -672,13 +672,20 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
 
+      // let processedSchema = tool.inputSchema;
+
       // const result = makeJsonSchemaGeminiCompatible(tool.inputSchema);
       // if (result.wasTransformed) {
       //   logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
       // }
       // let processedSchema = result.schema;
 
-      let processedSchema = tool.inputSchema;
+      const result = makeJsonSchemaOpenAICompatible(tool.inputSchema);
+      if (result.wasTransformed) {
+        logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for OpenAI: ", result.changesSummary);
+      }
+      let processedSchema = result.schema;
+
       
       return new DynamicStructuredTool({
         name: tool.name,
