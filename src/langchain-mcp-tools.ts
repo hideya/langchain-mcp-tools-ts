@@ -672,14 +672,13 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
 
-      // let processedSchema = makeJsonSchemaGeminiCompatible(tool.inputSchema);
-      const result = makeJsonSchemaGeminiCompatible(tool.inputSchema);
-      if (result.wasTransformed) {
-        logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
-      }
-      let processedSchema = result.schema;
+      // const result = makeJsonSchemaGeminiCompatible(tool.inputSchema);
+      // if (result.wasTransformed) {
+      //   logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
+      // }
+      // let processedSchema = result.schema;
 
-      // processedSchema = makeJsonSchemaOpenAICompatible(processedSchema, logger, `${serverName}/${tool.name}`);
+      let processedSchema = tool.inputSchema;
       
       return new DynamicStructuredTool({
         name: tool.name,

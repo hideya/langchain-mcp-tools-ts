@@ -48,6 +48,7 @@
     "test:coverage": "vitest run --coverage",
     "_comment_examples": "# Basic usage examples",
     "example:simple": "tsx testfiles/simple-usage.ts",
+    "example:openai-adapter": "tsx testfiles/openai-adapter-example.ts",
     "_comment_streamable": "# Streamable HTTP transport tests",
     "test:streamable:auth:server": "tsx testfiles/streamable-http-auth-test-server.ts",
     "test:streamable:auth:client": "tsx testfiles/streamable-http-auth-test-client.ts",
