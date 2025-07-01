@@ -687,10 +687,12 @@ async function convertSingleMcpToLangchainTools(
       }
       let processedSchema = result.schema;
 
-      
+      // const zodSchema = jsonSchemaToZod(processedSchema);
+
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
+        // schema: zodSchema,
         schema: processedSchema,
 
         func: async function(input) {

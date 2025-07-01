@@ -56,6 +56,7 @@ interface TransformationTracker {
   exclusiveBoundsConverted: number;
   additionalPropertiesAdded: number;
   nullableHandled: number;
+  zodArtifactsRemoved: number;
 }
 
 export function makeJsonSchemaOpenAICompatible(
@@ -71,15 +72,56 @@ export function makeJsonSchemaOpenAICompatible(
     exclusiveBoundsConverted: 0,
     additionalPropertiesAdded: 0,
     nullableHandled: 0,
+    zodArtifactsRemoved: 0,
   };
 
-  const result = transformSchemaInternal(schema, defsContext, tracker);
+  // First, remove Zod artifacts that confuse LangChain's schema detection
+  const cleanedSchema = removeZodArtifacts(schema, tracker);
+  
+  const result = transformSchemaInternal(cleanedSchema, defsContext, tracker);
   
   return {
     schema: result,
     wasTransformed: getTotalChanges(tracker) > 0,
     changesSummary: generateChangesSummary(tracker),
   };
+}
+
+function removeZodArtifacts(
+  schema: JsonSchema,
+  tracker: TransformationTracker
+): JsonSchema {
+  // Deep clone to avoid mutating the original
+  const cleaned = JSON.parse(JSON.stringify(schema));
+  
+  function cleanObject(obj: any): void {
+    if (typeof obj !== 'object' || obj === null) return;
+    
+    // Remove Zod-specific properties that can confuse LangChain's schema detection
+    const zodProps = ['_def', '_zod', '__brand', '_refinements', '_transforms'];
+    let removedAny = false;
+    
+    for (const prop of zodProps) {
+      if (prop in obj) {
+        delete obj[prop];
+        removedAny = true;
+      }
+    }
+    
+    if (removedAny) {
+      tracker.zodArtifactsRemoved++;
+    }
+    
+    // Recursively process nested objects/arrays
+    if (Array.isArray(obj)) {
+      obj.forEach(cleanObject);
+    } else {
+      Object.values(obj).forEach(cleanObject);
+    }
+  }
+  
+  cleanObject(cleaned);
+  return cleaned;
 }
 
 function transformSchemaInternal(
@@ -272,11 +314,16 @@ function getTotalChanges(tracker: TransformationTracker): number {
          tracker.formatsRemoved.length + 
          tracker.exclusiveBoundsConverted +
          tracker.additionalPropertiesAdded +
-         tracker.nullableHandled;
+         tracker.nullableHandled +
+         tracker.zodArtifactsRemoved;
 }
 
 function generateChangesSummary(tracker: TransformationTracker): string {
   const changes: string[] = [];
+  
+  if (tracker.zodArtifactsRemoved > 0) {
+    changes.push(`${tracker.zodArtifactsRemoved} Zod artifact(s) removed for LangChain compatibility`);
+  }
   
   if (tracker.referencesResolved > 0) {
     changes.push(`${tracker.referencesResolved} reference(s) resolved`);
