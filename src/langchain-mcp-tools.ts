@@ -12,6 +12,7 @@ import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/webso
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { jsonSchemaToZod } from "@h1deya/json-schema-to-zod";
 import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
 import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
 import { Logger } from "./logger.js";
