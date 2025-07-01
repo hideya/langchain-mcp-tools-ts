@@ -14,7 +14,6 @@
  * For the OpenAPI 3.0 subset limitations vs full JSON Schema
  *    see: https://ai.google.dev/gemini-api/docs/structured-output
  */
-
 interface JsonSchema {
   [key: string]: any;
 }
@@ -41,18 +40,58 @@ interface GeminiCompatibleSchema {
   default?: any;
 }
 
+interface TransformResult {
+  schema: GeminiCompatibleSchema;
+  wasTransformed: boolean;
+  changesSummary?: string;
+}
+
+interface TransformationTracker {
+  fieldsRemoved: string[];
+  fieldsConverted: string[];
+  referencesResolved: number;
+  typeArraysConverted: number;
+  formatsRemoved: string[];
+  exclusiveBoundsConverted: number;
+}
+
 export function makeJsonSchemaGeminiCompatible(
   schema: JsonSchema,
   defsContext: Record<string, JsonSchema> = {}
+): TransformResult {
+  const tracker: TransformationTracker = {
+    fieldsRemoved: [],
+    fieldsConverted: [],
+    referencesResolved: 0,
+    typeArraysConverted: 0,
+    formatsRemoved: [],
+    exclusiveBoundsConverted: 0,
+  };
+
+  const result = transformSchemaInternal(schema, defsContext, tracker);
+  
+  return {
+    schema: result,
+    wasTransformed: getTotalChanges(tracker) > 0,
+    changesSummary: generateChangesSummary(tracker),
+  };
+}
+
+function transformSchemaInternal(
+  schema: JsonSchema,
+  defsContext: Record<string, JsonSchema>,
+  tracker: TransformationTracker
 ): GeminiCompatibleSchema {
   // Handle $ref by resolving definitions
   if (schema.$ref) {
     const refPath = schema.$ref.replace('#/$defs/', '').replace('#/definitions/', '');
     const resolvedSchema = defsContext[refPath];
     if (resolvedSchema) {
-      return makeJsonSchemaGeminiCompatible(resolvedSchema, defsContext);
+      tracker.referencesResolved++;
+      return transformSchemaInternal(resolvedSchema, defsContext, tracker);
     }
     // If can't resolve, return a generic object
+    tracker.fieldsConverted.push(`$ref (unresolved): ${schema.$ref}`);
     return { type: 'object', description: `Reference: ${schema.$ref}` };
   }
 
@@ -60,12 +99,14 @@ export function makeJsonSchemaGeminiCompatible(
   if (schema.$defs || schema.definitions) {
     const defs = schema.$defs || schema.definitions;
     Object.assign(defsContext, defs);
+    tracker.fieldsRemoved.push('$defs/definitions');
   }
 
   const result: GeminiCompatibleSchema = {};
 
   // Handle type arrays (e.g., ["string", "null"]) -> convert to single type + nullable
   if (Array.isArray(schema.type)) {
+    tracker.typeArraysConverted++;
     const nonNullTypes = schema.type.filter((t: string) => t !== 'null');
     const hasNull = schema.type.includes('null');
     
@@ -89,7 +130,34 @@ export function makeJsonSchemaGeminiCompatible(
     result.type = schema.type;
   }
 
-  // Copy basic supported fields
+  // Handle format field - filter unsupported formats
+  if (schema.format) {
+    if (result.type === 'string') {
+      // Only allow supported string formats for Gemini
+      if (['enum', 'date-time'].includes(schema.format)) {
+        result.format = schema.format;
+      } else {
+        tracker.formatsRemoved.push(`${schema.format} (string)`);
+      }
+    } else if (result.type === 'number') {
+      // Only allow supported number formats
+      if (['float', 'double'].includes(schema.format)) {
+        result.format = schema.format;
+      } else {
+        tracker.formatsRemoved.push(`${schema.format} (number)`);
+      }
+    } else if (result.type === 'integer') {
+      // Only allow supported integer formats
+      if (['int32', 'int64'].includes(schema.format)) {
+        result.format = schema.format;
+      } else {
+        tracker.formatsRemoved.push(`${schema.format} (integer)`);
+      }
+    } else {
+      tracker.formatsRemoved.push(`${schema.format} (${result.type})`);
+    }
+  }
+  // Copy other basic supported fields
   if (schema.description) result.description = schema.description;
   if (schema.enum) result.enum = schema.enum;
   if (schema.nullable !== undefined) result.nullable = schema.nullable;
@@ -97,33 +165,12 @@ export function makeJsonSchemaGeminiCompatible(
   if (schema.default !== undefined) result.default = schema.default;
   if (schema.pattern) result.pattern = schema.pattern;
 
-  // Handle format field - filter unsupported formats
-  if (schema.format) {
-    if (result.type === 'string') {
-      // Only allow supported string formats for Gemini
-      if (['enum', 'date-time'].includes(schema.format)) {
-        result.format = schema.format;
-      }
-      // Drop unsupported string formats (uri, uuid, url, email, etc.)
-    } else if (result.type === 'number') {
-      // Only allow supported number formats
-      if (['float', 'double'].includes(schema.format)) {
-        result.format = schema.format;
-      }
-    } else if (result.type === 'integer') {
-      // Only allow supported integer formats
-      if (['int32', 'int64'].includes(schema.format)) {
-        result.format = schema.format;
-      }
-    }
-    // For other types, don't set format
-  }
-
   // Handle numeric constraints - convert exclusive to inclusive
   if (typeof schema.minimum === 'number') {
     result.minimum = schema.minimum;
   }
   if (typeof schema.exclusiveMinimum === 'number') {
+    tracker.exclusiveBoundsConverted++;
     // Convert exclusive to inclusive (approximate)
     result.minimum = schema.exclusiveMinimum + (Number.isInteger(schema.exclusiveMinimum) ? 1 : 0.0001);
   }
@@ -131,6 +178,7 @@ export function makeJsonSchemaGeminiCompatible(
     result.maximum = schema.maximum;
   }
   if (typeof schema.exclusiveMaximum === 'number') {
+    tracker.exclusiveBoundsConverted++;
     // Convert exclusive to inclusive (approximate)
     result.maximum = schema.exclusiveMaximum - (Number.isInteger(schema.exclusiveMaximum) ? 1 : 0.0001);
   }
@@ -143,14 +191,15 @@ export function makeJsonSchemaGeminiCompatible(
   if (typeof schema.minItems === 'number') result.minItems = schema.minItems;
   if (typeof schema.maxItems === 'number') result.maxItems = schema.maxItems;
   if (schema.items) {
-    result.items = makeJsonSchemaGeminiCompatible(schema.items, defsContext);
+    const itemsResult = transformSchemaInternal(schema.items, defsContext, tracker);
+    result.items = itemsResult;
   }
 
   // Handle object properties
   if (schema.properties) {
     result.properties = {};
     for (const [key, propSchema] of Object.entries(schema.properties)) {
-      result.properties[key] = makeJsonSchemaGeminiCompatible(propSchema as JsonSchema, defsContext);
+      result.properties[key] = transformSchemaInternal(propSchema as JsonSchema, defsContext, tracker);
     }
   }
 
@@ -161,9 +210,10 @@ export function makeJsonSchemaGeminiCompatible(
   // Handle anyOf (supported) but convert allOf/oneOf to anyOf
   if (schema.anyOf) {
     result.anyOf = schema.anyOf.map((s: JsonSchema) => 
-      makeJsonSchemaGeminiCompatible(s, defsContext)
+      transformSchemaInternal(s, defsContext, tracker)
     );
   } else if (schema.allOf) {
+    tracker.fieldsConverted.push('allOf → object merge');
     // Convert allOf to object merge (best effort)
     const merged: JsonSchema = { type: 'object' };
     for (const subSchema of schema.allOf) {
@@ -175,15 +225,16 @@ export function makeJsonSchemaGeminiCompatible(
         merged.required = [...(merged.required || []), ...subSchema.required];
       }
     }
-    return makeJsonSchemaGeminiCompatible(merged, defsContext);
+    return transformSchemaInternal(merged, defsContext, tracker);
   } else if (schema.oneOf) {
+    tracker.fieldsConverted.push('oneOf → anyOf');
     // Convert oneOf to anyOf (less strict)
     result.anyOf = schema.oneOf.map((s: JsonSchema) => 
-      makeJsonSchemaGeminiCompatible(s, defsContext)
+      transformSchemaInternal(s, defsContext, tracker)
     );
   }
 
-  // Remove unsupported fields that might cause errors
+  // Track removal of unsupported fields
   const unsupportedFields = [
     '$schema', '$id', '$ref', '$defs', 'definitions', 
     'exclusiveMinimum', 'exclusiveMaximum', 'additionalProperties', 
@@ -191,22 +242,70 @@ export function makeJsonSchemaGeminiCompatible(
     'allOf', 'oneOf', 'not', 'const', 'contains', 'unevaluatedProperties'
   ];
 
-  // Ensure we don't pass through any unsupported fields
   for (const field of unsupportedFields) {
-    delete (result as any)[field];
+    if (schema[field] !== undefined && !['allOf', 'oneOf', 'exclusiveMinimum', 'exclusiveMaximum', '$defs', 'definitions', '$ref'].includes(field)) {
+      tracker.fieldsRemoved.push(field);
+    }
   }
 
   return result;
+}
+
+function getTotalChanges(tracker: TransformationTracker): number {
+  return tracker.fieldsRemoved.length + 
+         tracker.fieldsConverted.length + 
+         tracker.referencesResolved + 
+         tracker.typeArraysConverted + 
+         tracker.formatsRemoved.length + 
+         tracker.exclusiveBoundsConverted;
+}
+
+function generateChangesSummary(tracker: TransformationTracker): string {
+  const changes: string[] = [];
+  
+  if (tracker.referencesResolved > 0) {
+    changes.push(`${tracker.referencesResolved} reference(s) resolved`);
+  }
+  
+  if (tracker.typeArraysConverted > 0) {
+    changes.push(`${tracker.typeArraysConverted} type array(s) converted`);
+  }
+  
+  if (tracker.exclusiveBoundsConverted > 0) {
+    changes.push(`${tracker.exclusiveBoundsConverted} exclusive bound(s) converted`);
+  }
+  
+  if (tracker.formatsRemoved.length > 0) {
+    const formatTypes = [...new Set(tracker.formatsRemoved.map(f => f.split(' ')[0]))];
+    changes.push(`${tracker.formatsRemoved.length} unsupported format(s) removed (${formatTypes.slice(0, 3).join(', ')}${formatTypes.length > 3 ? '...' : ''})`);
+  }
+  
+  if (tracker.fieldsConverted.length > 0) {
+    changes.push(`${tracker.fieldsConverted.length} field(s) converted (${tracker.fieldsConverted.slice(0, 2).join(', ')}${tracker.fieldsConverted.length > 2 ? '...' : ''})`);
+  }
+  
+  if (tracker.fieldsRemoved.length > 0) {
+    const removedTypes = [...new Set(tracker.fieldsRemoved)];
+    changes.push(`${tracker.fieldsRemoved.length} unsupported field(s) removed (${removedTypes.slice(0, 3).join(', ')}${removedTypes.length > 3 ? '...' : ''})`);
+  }
+  
+  if (changes.length === 0) {
+    return '';
+  }
+  
+  return changes.join(', ');
 }
 
 /**
  * Specifically transforms MCP tool schemas for Gemini function declarations
  */
 export function transformMcpToolForGemini(mcpTool: any) {
+  const transformResult = makeJsonSchemaGeminiCompatible(mcpTool.inputSchema || {});
+  
   const functionDeclaration = {
     name: mcpTool.name,
     description: mcpTool.description,
-    parameters: makeJsonSchemaGeminiCompatible(mcpTool.inputSchema || {})
+    parameters: transformResult.schema
   };
 
   // Ensure parameters has a type if not set
@@ -214,7 +313,11 @@ export function transformMcpToolForGemini(mcpTool: any) {
     functionDeclaration.parameters.type = 'object';
   }
 
-  return functionDeclaration;
+  return {
+    functionDeclaration,
+    wasTransformed: transformResult.wasTransformed,
+    changesSummary: transformResult.changesSummary
+  };
 }
 
 /**
