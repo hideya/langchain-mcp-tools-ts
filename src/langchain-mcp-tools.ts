@@ -128,6 +128,9 @@ export interface ConvertMcpToLangchainOptions extends LogOptions {
   logger?: McpToolsLogger;
   llmProvider?: LlmProvider;
 }
+export interface McpServerCleanupFn {
+  (): Promise<void>;
+}
 
 /**
  * Error interface for MCP-related errors.
@@ -138,10 +141,6 @@ export interface ConvertMcpToLangchainOptions extends LogOptions {
 export interface McpError extends Error {
   serverName: string;
   details?: unknown;
-}
-
-export interface McpServerCleanupFn {
-  (): Promise<void>;
 }
 
 // Custom error type for MCP server initialization failures
