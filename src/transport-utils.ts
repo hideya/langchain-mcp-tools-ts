@@ -17,7 +17,7 @@ import { McpToolsLogger, UrlBasedConfig } from "./langchain-mcp-tools.js";
  * 
  * @internal This function is meant to be used internally by transport creation functions
  */
-export function createStreamableHttpOptions(
+function createStreamableHttpOptions(
   config: UrlBasedConfig,
   logger: McpToolsLogger,
   serverName: string
@@ -60,7 +60,7 @@ export function createStreamableHttpOptions(
  * 
  * @internal This function is meant to be used internally by transport creation functions
  */
-export function createSseOptions(
+function createSseOptions(
   config: UrlBasedConfig,
   logger: McpToolsLogger,
   serverName: string
@@ -96,7 +96,7 @@ export function createSseOptions(
  * 
  * @internal This function is meant to be used internally by createHttpTransportWithFallback
  */
-export function is4xxError(error: unknown): boolean {
+function is4xxError(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
   }
@@ -142,7 +142,7 @@ export function is4xxError(error: unknown): boolean {
  * 
  * @internal This function is meant to be used internally by createHttpTransportWithFallback
  */
-export async function testTransportSupport(
+async function testTransportSupport(
   url: URL,
   config: UrlBasedConfig,
   logger: McpToolsLogger,
@@ -214,7 +214,7 @@ export async function testTransportSupport(
       return "streamable_http";
     } else if (response.status >= 400 && response.status < 500) {
       // 4xx error indicates fallback to SSE per MCP spec
-      logger.info(`MCP server "${serverName}": received ${response.status}, falling back to SSE transport`);
+      logger.info(`MCP server "${serverName}": Streamable HTTP test received ${response.status}, falling back to SSE transport`);
       return "sse";
     } else {
       // Other errors should be re-thrown
