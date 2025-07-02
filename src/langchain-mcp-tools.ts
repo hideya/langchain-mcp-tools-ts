@@ -15,6 +15,7 @@ import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod } from "@h1deya/json-schema-to-zod";
 import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
 import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
+import { jsonSchemaToZodForOpenAI, safeTransformZodForOpenAI } from "./openai-zod-converter.js";
 import { Logger } from "./logger.js";
 
 
@@ -687,11 +688,38 @@ async function convertSingleMcpToLangchainTools(
       }
       let processedSchema = result.schema;
 
-      const zodSchema = jsonSchemaToZod(processedSchema);
+      // // **KEY FIX**: Use OpenAI-compatible Zod converter
+      // let zodSchema;
+      // try {
+      //   // First try the custom OpenAI-compatible converter
+      //   zodSchema = jsonSchemaToZodForOpenAI(processedSchema, { name: tool.name });
+        
+      //   // Additional transformation to ensure no .optional() without .nullable()
+      //   zodSchema = transformZodSchemaForOpenAI(zodSchema);
+        
+      //   logger.debug(`MCP server "${serverName}/${tool.name}": Created OpenAI-compatible Zod schema`);
+      // } catch (error) {
+      //   logger.warn(`MCP server "${serverName}/${tool.name}": OpenAI Zod conversion failed, falling back to standard converter:`, error);
+        
+      //   // Fallback to the original converter if the new one fails
+      //   zodSchema = jsonSchemaToZod(processedSchema);
+        
+      //   // Try to transform it to be OpenAI compatible
+      //   try {
+      //     zodSchema = transformZodSchemaForOpenAI(zodSchema);
+      //     logger.info(`MCP server "${serverName}/${tool.name}": Applied OpenAI compatibility transform to fallback schema`);
+      //   } catch (transformError) {
+      //     logger.warn(`MCP server "${serverName}/${tool.name}": Could not make fallback schema OpenAI compatible:`, transformError);
+      //   }
+      // }
+
+      let zodSchema = jsonSchemaToZod(processedSchema);
+      zodSchema = safeTransformZodForOpenAI(zodSchema);
       
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
+        // schema: processedSchema,
         schema: zodSchema,
 
         func: async function(input) {
