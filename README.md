@@ -100,8 +100,9 @@ by gathering available MCP tools from the servers,
 and by wrapping them into LangChain tools.
 
 If `llmProvider` option is specified, it performs LLM provider-specific schema transformations
-of the MCP tools to prevent schema compatibility issues.  
-Set this option when you enconter schema related warnings/errors while execution.
+for MCP tools to prevent schema compatibility issues.
+Set this option when you enconter schema related warnings/errors while execution.  
+[See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
 
 It also returns an async callback function (`cleanup: McpServerCleanupFn`)
 to be invoked to close all MCP server sessions when finished.
@@ -143,8 +144,8 @@ While MCP tools can return multiple content types (text, images, etc.), this lib
 
 ### Notes:
 
-- **LLM Compatibility and Schema Transformations**: The library performs schema transformations for LLM compatibility.
-  [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-shcema-compatibility) for details.
+- **LLM Compatibility and Schema Transformations**: The library can perform schema transformations for LLM compatibility.
+  [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
 - **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to stdio server configrations if not explicitly provided to ensure servers can find required executables.
 
 
@@ -327,13 +328,13 @@ This creates challenges for developers trying to create universal schemas across
 Many MCP servers generate schemas that don't satisfy all providers' requirements.  
 For example, the official Notion MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (as of Jul 2, 2025) produces:
 
-**OpenAI warnings:**
+**OpenAI Warnings:**
 ```
 Zod field at `#/definitions/API-get-users/properties/start_cursor` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
 ... followed by many more
 ```
 
-**Gemini errors:**
+**Gemini Errors:**
 ```
 GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] * GenerateContentRequest.tools[0].function_declarations[0].parameters.properties[children].items.properties[paragraph].properties[rich_text].items.properties[mention].any_of[0].required: only allowed for OBJECT type
 ... followed by many more
@@ -341,7 +342,7 @@ GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from ht
 
 #### Solution
 
-This library performs provider-specific JSON schema transformations using the `llmProvider` option:
+The new option, `llmProvider`, has been introduced for performing provider-specific JSON schema transformations:
 
 ```typescript
 const { tools, cleanup } = await convertMcpToLangchainTools(
