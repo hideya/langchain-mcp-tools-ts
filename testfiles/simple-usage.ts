@@ -87,21 +87,24 @@ export async function test(): Promise<void> {
       //   // optionally `transport: "ws"` or `type: "ws"`
       // },
 
-      "notion": {
-        "command": "npx",
-        "args": ["-y", "@suekou/mcp-notion-server"],
-        "env": {
-          "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
-        }
-      },
-
-      // notion: {
+      // "notion": {
       //   "command": "npx",
-      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "args": ["-y", "@suekou/mcp-notion-server"],
       //   "env": {
-      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-      //   },
+      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
+      //   }
       // },
+
+      notion: {
+        "command": "npx",
+        "args": ["-y", "@notionhq/notion-mcp-server"],
+        "env": {
+          // Although the following implies that this MCP server is designed for
+          // OpenAI LLMs, it works fine with others models.
+          // Tested Claude and Gemini (with schema adjustments).
+          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+        },
+      },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -170,19 +173,19 @@ export async function test(): Promise<void> {
         logger: new SimpleConsoleLogger(),
         // llmProvider: "anthropic",
         // llmProvider: "openai",
-        llmProvider: "google_gemini",
+        // llmProvider: "google_gemini",
         // llmProvider: "google_genai",
       }
     );
 
     mcpCleanup = cleanup
 
-    // const llm = new ChatAnthropic({
-    //   // https://docs.anthropic.com/en/docs/about-claude/pricing
-    //   // https://console.anthropic.com/settings/billing
-    //   model: "claude-3-5-haiku-latest"
-    //   // model: "claude-sonnet-4-0"
-    // });
+    const llm = new ChatAnthropic({
+      // https://docs.anthropic.com/en/docs/about-claude/pricing
+      // https://console.anthropic.com/settings/billing
+      model: "claude-3-5-haiku-latest"
+      // model: "claude-sonnet-4-0"
+    });
 
     // const llm = new ChatOpenAI({
     //   // https://platform.openai.com/docs/pricing
@@ -191,13 +194,13 @@ export async function test(): Promise<void> {
     //   // model: "o4-mini"
     // });
 
-    const llm = new ChatGoogleGenerativeAI({
-      // https://ai.google.dev/gemini-api/docs/pricing
-      // https://console.cloud.google.com/billing
-      // model: "gemini-2.0-flash"
-      model: "gemini-2.5-flash"
-      // model: "gemini-2.5-pro"
-    });
+    // const llm = new ChatGoogleGenerativeAI({
+    //   // https://ai.google.dev/gemini-api/docs/pricing
+    //   // https://console.cloud.google.com/billing
+    //   // model: "gemini-2.0-flash"
+    //   model: "gemini-2.5-flash"
+    //   // model: "gemini-2.5-pro"
+    // });
 
     const agent = createReactAgent({
       llm,
