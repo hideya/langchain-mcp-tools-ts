@@ -78,3 +78,5 @@ When the option is not given, it uses the schema as is:
       mcpServers
     );
 ```
+
+---

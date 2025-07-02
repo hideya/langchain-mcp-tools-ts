@@ -17,7 +17,6 @@
  * 
  * For the OpenAPI subset requirement for function declarations
  *    see: https://ai.google.dev/api/caching#Schema
- * 
  * For the OpenAPI 3.0 subset limitations vs full JSON Schema
  *    see: https://ai.google.dev/gemini-api/docs/structured-output
  */

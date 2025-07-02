@@ -688,7 +688,12 @@ async function convertSingleMcpToLangchainTools(
       let processedSchema: ToolSchemaBase = tool.inputSchema;
       
       if (llmProvider === "openai") {
-        processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+        const result = makeJsonSchemaOpenAICompatible(processedSchema);
+        if (result.wasTransformed) {
+          logger.info(`MCP server "${serverName}/${tool.name}"`, 
+            "Schema transformed for OpenAI: ", result.changesSummary);
+        }
+        processedSchema = result.schema;
         // Although the following issue was marked as completed, somehow
         // I am still experiencing the same difficulties as of July 2, 2025...
         //   https://github.com/langchain-ai/langchainjs/issues/6623
@@ -704,11 +709,14 @@ async function convertSingleMcpToLangchainTools(
         processedSchema = result.schema;
 
       } else if (llmProvider === "anthropic") {
-        // Claude seems open-minded about the schema
-        // Tested the newly introduced direct JSON schema passing
+        // Claude seems to have very relaxed schema requirements
+        // and hasn't encountered any issues so far.
+        // I haven't seen any official documentation that mentions specific
+        // schema validation requirements.
 
       } else {
-        // Take a conservative approach to passing the Zod schema the old way
+        // Take a conservative approach to passing the Zod schema.
+        // It's old, but well exercised.
         processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
       }
       
