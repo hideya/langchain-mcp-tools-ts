@@ -2,11 +2,18 @@
  * Transforms a JSON Schema to be compatible with Gemini's OpenAPI 3.0 subset
  * Used for converting MCP tool schemas to Gemini function declarations
  * 
- * The changes are mostly cosmetic/validation-level and shouldn't break core
+ * The changes are mostly structural/validation-level and shouldn't break core
  * tool functionality:
  * - Core parameter structure is preserved
- * - Required fields are maintained
+ * - Valid required fields are maintained (invalid ones are filtered out)
  * - Basic types are converted accurately
+ * - anyOf variants are individually validated and fixed
+ * 
+ * Key transformations for Gemini compatibility:
+ * - Filters required fields that don't exist in properties
+ * - Ensures anyOf variants follow Gemini's strict validation rules
+ * - Removes unsupported JSON Schema features
+ * - Converts type arrays to nullable single types where possible
  * 
  * For the OpenAPI subset requirement for function declarations
  *    see: https://ai.google.dev/api/caching#Schema

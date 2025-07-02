@@ -203,7 +203,7 @@ export async function convertMcpToLangchainTools(
   const llmProvider = options?.llmProvider;
 
   if (llmProvider) {
-    logger.info(`Converting MCP tool schemas for LLM Provider: ${llmProvider}`);
+    logger.info(`Converting MCP tool schemas for the LLM Provider: ${llmProvider}`);
   }
 
   const serverInitPromises = Object.entries(configs).map(async ([name, config]) => {

@@ -173,19 +173,19 @@ export async function test(): Promise<void> {
         logger: new SimpleConsoleLogger(),
         // llmProvider: "anthropic",
         // llmProvider: "openai",
-        // llmProvider: "google_gemini",
+        llmProvider: "google_gemini",
         // llmProvider: "google_genai",
       }
     );
 
     mcpCleanup = cleanup
 
-    const llm = new ChatAnthropic({
-      // https://docs.anthropic.com/en/docs/about-claude/pricing
-      // https://console.anthropic.com/settings/billing
-      model: "claude-3-5-haiku-latest"
-      // model: "claude-sonnet-4-0"
-    });
+    // const llm = new ChatAnthropic({
+    //   // https://docs.anthropic.com/en/docs/about-claude/pricing
+    //   // https://console.anthropic.com/settings/billing
+    //   model: "claude-3-5-haiku-latest"
+    //   // model: "claude-sonnet-4-0"
+    // });
 
     // const llm = new ChatOpenAI({
     //   // https://platform.openai.com/docs/pricing
@@ -194,13 +194,13 @@ export async function test(): Promise<void> {
     //   // model: "o4-mini"
     // });
 
-    // const llm = new ChatGoogleGenerativeAI({
-    //   // https://ai.google.dev/gemini-api/docs/pricing
-    //   // https://console.cloud.google.com/billing
-    //   // model: "gemini-2.0-flash"
-    //   model: "gemini-2.5-flash"
-    //   // model: "gemini-2.5-pro"
-    // });
+    const llm = new ChatGoogleGenerativeAI({
+      // https://ai.google.dev/gemini-api/docs/pricing
+      // https://console.cloud.google.com/billing
+      // model: "gemini-2.0-flash"
+      model: "gemini-2.5-flash"
+      // model: "gemini-2.5-pro"
+    });
 
     const agent = createReactAgent({
       llm,
