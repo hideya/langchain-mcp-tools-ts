@@ -4,84 +4,70 @@ This document captures technical issues encountered during the implementation of
 
 ## 1. LLM Provider Schema Compatibility Issue
 
-### Incompatibility
+### Problem
 
-The incompatibility exists primarily between:
-- OpenAI's structured outputs approach
-- Google's Gemini API (not Vertex AI) function calling schemas
+Different LLM providers have incompatible JSON Schema requirements for function calling:
 
-The incompatibility is:
-- **OpenAI requires**: `required: true` + `nullable: true` (via union types)
-- **Google Gemini API**: rejects `nullable: true` in function calling
+- **OpenAI requires**: Optional fields must be nullable (`.optional()` + `.nullable()`)
+- **Google Gemini API**: Rejects nullable fields and requires strict OpenAPI 3.0 subset compliance
+- **Anthropic Claude**: Very relaxed schema requirements with no documented restrictions
 
-  Note that **Google Vertex AI** provides API endpoints that support `nullable: true` (e.g. OpenAI-compatible endpoint) 
+**Note**: Google Vertex AI provides OpenAI-compatible endpoints that support nullable fields.
 
-For details:
-- OpenAI function calling requirements:
-  https://platform.openai.com/docs/guides/function-calling
+### Real-World Impact
 
-- Gemini's OpenAPI subset requirement for function declarations:
-  https://ai.google.dev/api/caching#Schema
+This creates challenges for developers trying to create universal schemas across providers.
 
-### Issue
+Many MCP servers generate schemas that don't satisfy all providers' requirements.  
+For example, the official Notion MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (as of Jul 2, 2025) produces:
 
-This creates challenges for developers trying to create universal schemas
-that work across both OpenAI and Google Gemini API.
-
-In addition, there are MCP servers that have issues with those requirements/restrictions.
-
-For example, as of Jul 2, 2025, the official Notion MCP server
-[@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server)
-generates many warnings like the following with OpenAI's LLMs:
-
+**OpenAI warnings:**
 ```
 Zod field at `#/definitions/API-get-users/properties/start_cursor` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
-...
 ```
 
-Besides, Gemini fails to work with it with the following error:
-
+**Gemini errors:**
 ```
-GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] Invalid JSON payload received. Unknown name "const" at 'tools[0].function_declarations[6].parameters.properties[1].value.items.properties[0].value.properties[0].value.items.properties[1].value': Cannot find field.
-...
-    at handleResponseNotOk (file:///Users/hideya/Desktop/WS/AT/langchain-mcp-tools-ts/node_modules/@google/generative-ai/dist/index.mjs:432:11)
-    ...
+GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] * GenerateContentRequest.tools[0].function_declarations[0].parameters.properties[children].items.properties[paragraph].properties[rich_text].items.properties[mention].any_of[0].required: only allowed for OBJECT type
 ```
-
-Becasue we cannot generate a universal schema that satisfies the requirements by OpenAI and Gemini,
-the schema issue needs to be handled specific to the model provider.
 
 ### Solution
 
-The approach taken by this library is to perofrm JSON schema adjustments to satisfy the target provider.
+This library performs provider-specific JSON schema transformations using the `llmProvider` option:
 
-A new option `llmProver` has been introduced so that `convertMcpToLangchainTools()` can convert
-MCP tool schema acordingly when to convert MCP tools into LangChain-compatible tools.
-
-```
-    const { tools, cleanup } = await convertMcpToLangchainTools(
-      mcpServers, {
-        llmProvider: "openai"
-        // llmProvider: "google_gemini" // or `llmProvider: "google_genai"`
-        // llmProvider: "anthropic"
-      }
-    );
+```typescript
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers, {
+    llmProvider: "openai"        // Makes optional fields nullable
+    // llmProvider: "google_gemini" // Applies Gemini's strict validation rules  
+    // llmProvider: "anthropic"     // No transformations needed
+  }
+);
 ```
 
-It generates log output at the INFO level when any converstion is performed,
-so that the user can notice necessary adjustment in the MCP server schema.
+**Features:**
+- Generates INFO-level logs when transformations are applied
+- Helps users identify potential MCP server schema improvements
+- Falls back to original schema when no `llmProvider` is specified
 
-When the option is not given, it uses the schema as is:
+### Provider-Specific Transformations
 
+| Provider | Transformations Applied |
+|----------|------------------------|
+| `openai` | Makes optional fields nullable, handles union types |
+| `google_gemini` | Filters invalid required fields, fixes anyOf variants, removes unsupported features |
+| `anthropic` | Accepts schemas as-is, but handles them efficiently |
+
+For other providers, try without specifying the option:
+
+```typescript
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers
+);
 ```
-    const { tools, cleanup } = await convertMcpToLangchainTools(
-      mcpServers
-    );
-```
 
-Claude seems to have very relaxed schema requirements
-and hasn't encountered any issues so far.
-I haven't seen any official documentation that mentions specific
-schema validation requirements.
+### References
 
----
+- [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
+- [Gemini API Schema Requirements](https://ai.google.dev/api/caching#Schema)
+- [Anthropic Tool Use](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview)
