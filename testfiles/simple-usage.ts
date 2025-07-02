@@ -87,11 +87,21 @@ export async function test(): Promise<void> {
       //   // optionally `transport: "ws"` or `type: "ws"`
       // },
 
-      // "notion": {
-      //   "command": "npx",
-      //   "args": ["-y", "@suekou/mcp-notion-server"],
-      //   "env": {
-      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
+      // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
+      "brave-search": {
+          "command": "npx",
+          "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
+          "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+      },
+
+      // // Example of authentication via Authorization header
+      // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
+      // github: {
+      //   // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
+      //   type: "http",  // or `transport: "http",`
+      //   url: "https://api.githubcopilot.com/mcp/",
+      //   headers: {
+      //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
       //   }
       // },
 
@@ -106,14 +116,11 @@ export async function test(): Promise<void> {
         },
       },
 
-      // // Example of authentication via Authorization header
-      // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
-      // github: {
-      //   // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
-      //   type: "http",  // or `transport: "http",`
-      //   url: "https://api.githubcopilot.com/mcp/",
-      //   headers: {
-      //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
+      // "notion": {
+      //   "command": "npx",
+      //   "args": ["-y", "@suekou/mcp-notion-server"],
+      //   "env": {
+      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
       //   }
       // },
 
@@ -222,7 +229,8 @@ export async function test(): Promise<void> {
     //   "increment the coutns by 1, and show all the items in the DB."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
-    const query = "Tell me about my Notion account"
+    // const query = "Tell me about my Notion account"
+    const query = "Can you give me one of today's news in Tokyo?"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
