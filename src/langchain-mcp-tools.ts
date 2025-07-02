@@ -2,8 +2,7 @@ import { IOType } from "node:child_process";
 import { Stream } from "node:stream";
 import { DynamicStructuredTool, StructuredTool, ToolSchemaBase } from "@langchain/core/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StreamableHTTPReconnectionOptions } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -65,10 +64,7 @@ export interface UrlBasedConfig {
   streamableHTTPOptions?: {
     authProvider?: OAuthClientProvider;
     requestInit?: RequestInit;
-    reconnectionOptions?: {
-      maxReconnectAttempts?: number;
-      reconnectDelay?: number;
-    };
+    reconnectionOptions?: StreamableHTTPReconnectionOptions;
     sessionId?: string;
   };
 
