@@ -19,6 +19,7 @@
  * 
  * For OpenAI function calling requirements:
  *    see: https://platform.openai.com/docs/guides/function-calling
+ * 
  * For OpenAI structured outputs (where this constraint is documented):
  *    see: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
  */
