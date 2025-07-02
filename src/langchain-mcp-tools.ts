@@ -674,16 +674,23 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
 
+      // const llmProvider = undefined;
+      // const llmProvider = "openai";
+      const llmProvider = "google_gemini";
+
       let processedSchema: ToolInputSchemaBase = tool.inputSchema;
       
-      // const result = makeJsonSchemaGeminiCompatible(processedSchema);
-      // if (result.wasTransformed) {
-      //   logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
-      // }
-      // processedSchema = result.schema;
+      if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
+        const result = makeJsonSchemaGeminiCompatible(processedSchema);
+        if (result.wasTransformed) {
+          logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
+        }
+        processedSchema = result.schema;
 
-      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
-      processedSchema = jsonSchemaToZod(processedSchema);
+      } else if (llmProvider === "openai") {
+        processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+        processedSchema = jsonSchemaToZod(processedSchema);
+      }
       
       return new DynamicStructuredTool({
         name: tool.name,
