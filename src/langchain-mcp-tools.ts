@@ -15,7 +15,8 @@ import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod } from "@h1deya/json-schema-to-zod";
 import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
 import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
-import { jsonSchemaToZodForOpenAI, safeTransformZodForOpenAI } from "./openai-zod-converter.js";
+// import { jsonSchemaToZodForOpenAI, safeTransformZodForOpenAI } from "./openai-zod-converter.js";
+import { jsonSchemaToZodForOpenAI } from "./openai-zod-converter.js";
 import { Logger } from "./logger.js";
 
 
@@ -674,7 +675,7 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
 
-      // let processedSchema = tool.inputSchema;
+      let processedSchema = tool.inputSchema;
 
       // const result = makeJsonSchemaGeminiCompatible(tool.inputSchema);
       // if (result.wasTransformed) {
@@ -682,11 +683,11 @@ async function convertSingleMcpToLangchainTools(
       // }
       // let processedSchema = result.schema;
 
-      const result = makeJsonSchemaOpenAICompatible(tool.inputSchema);
-      if (result.wasTransformed) {
-        logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for OpenAI: ", result.changesSummary);
-      }
-      let processedSchema = result.schema;
+      // const result = makeJsonSchemaOpenAICompatible(tool.inputSchema);
+      // if (result.wasTransformed) {
+      //   logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for OpenAI: ", result.changesSummary);
+      // }
+      // let processedSchema = result.schema;
 
       // // **KEY FIX**: Use OpenAI-compatible Zod converter
       // let zodSchema;
@@ -713,8 +714,10 @@ async function convertSingleMcpToLangchainTools(
       //   }
       // }
 
+      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+
       let zodSchema = jsonSchemaToZod(processedSchema);
-      zodSchema = safeTransformZodForOpenAI(zodSchema);
+      // zodSchema = safeTransformZodForOpenAI(zodSchema);
       
       return new DynamicStructuredTool({
         name: tool.name,

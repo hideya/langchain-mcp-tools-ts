@@ -258,45 +258,92 @@ function convertObjectSchema(schema: JsonSchema, options: ConversionOptions): z.
 }
 
 /**
- * SIMPLIFIED: Safe transformation that only converts .optional() to .nullable()
- * This is much safer than the recursive approach and avoids corruption issues
+ * Helper function to validate that a Zod schema is compatible with OpenAI structured outputs
  */
-export function safeTransformZodForOpenAI(schema: z.ZodType<any>): z.ZodType<any> {
-  // Only handle the most common case: ZodOptional -> ZodNullable
-  if (schema instanceof z.ZodOptional) {
-    return schema.unwrap().nullable();
-  }
+export function validateZodSchemaForOpenAI(schema: z.ZodType<any>, path = ''): string[] {
+  const errors: string[] = [];
+
+  // This is a simplified validation - in practice, you'd need to traverse the Zod schema
+  // and check for incompatible constructs like .optional() without .nullable()
   
-  // For ZodObject, only transform the top-level optional fields
-  if (schema instanceof z.ZodObject) {
-    const shape = schema.shape;
-    const newShape: Record<string, z.ZodType<any>> = {};
-    let hasChanges = false;
-
-    for (const [key, zodType] of Object.entries(shape)) {
-      if (zodType instanceof z.ZodOptional) {
-        newShape[key] = zodType.unwrap().nullable();
-        hasChanges = true;
-      } else {
-        newShape[key] = zodType;
-      }
-    }
-
-    if (hasChanges) {
-      return z.object(newShape).strict();
-    }
+  // For now, we'll just provide a basic check
+  const schemaString = schema.toString();
+  
+  if (schemaString.includes('.optional()') && !schemaString.includes('.nullable()')) {
+    errors.push(`Schema at ${path} may contain .optional() without .nullable() which is not supported by OpenAI`);
   }
 
-  // Return original schema if no transformation needed
-  return schema;
+  return errors;
 }
 
 /**
- * DEPRECATED: The original recursive transformer - causes issues
- * Keeping for reference but should not be used
+ * Alternative approach: Create a wrapper that ensures all optional fields are nullable
+ */
+export function ensureOpenAICompatibility<T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>
+): z.ZodObject<any> {
+  const originalShape = schema.shape;
+  const newShape: Record<string, z.ZodType<any>> = {};
+
+  for (const [key, zodType] of Object.entries(originalShape)) {
+    if (zodType instanceof z.ZodOptional) {
+      // Convert .optional() to .nullable() for OpenAI compatibility
+      newShape[key] = zodType.unwrap().nullable();
+    } else {
+      newShape[key] = zodType;
+    }
+  }
+
+  return z.object(newShape).strict();
+}
+
+/**
+ * Utility to recursively transform a Zod schema to be OpenAI compatible
+ * This handles nested objects and arrays
  */
 export function transformZodSchemaForOpenAI(schema: z.ZodType<any>): z.ZodType<any> {
-  // This function is deprecated due to recursion issues
-  // Use safeTransformZodForOpenAI instead
-  return safeTransformZodForOpenAI(schema);
+  if (schema instanceof z.ZodObject) {
+    const shape = schema.shape;
+    const newShape: Record<string, z.ZodType<any>> = {};
+
+    for (const [key, zodType] of Object.entries(shape)) {
+      newShape[key] = transformZodSchemaForOpenAI(zodType);
+    }
+
+    return z.object(newShape).strict();
+  }
+
+  if (schema instanceof z.ZodArray) {
+    const elementSchema = transformZodSchemaForOpenAI(schema.element);
+    let arraySchema = z.array(elementSchema);
+    
+    // Preserve array constraints
+    const minLength = (schema as any)._def.minLength;
+    const maxLength = (schema as any)._def.maxLength;
+    
+    if (minLength !== null) {
+      arraySchema = arraySchema.min(minLength.value);
+    }
+    if (maxLength !== null) {
+      arraySchema = arraySchema.max(maxLength.value);
+    }
+    
+    return arraySchema;
+  }
+
+  if (schema instanceof z.ZodOptional) {
+    // Convert .optional() to .nullable() for OpenAI compatibility
+    return transformZodSchemaForOpenAI(schema.unwrap()).nullable();
+  }
+
+  if (schema instanceof z.ZodUnion) {
+    // Handle unions (though OpenAI has limited support)
+    const options = schema.options.map((option: z.ZodType<any>) => 
+      transformZodSchemaForOpenAI(option)
+    );
+    return z.union(options as [z.ZodType, z.ZodType, ...z.ZodType[]]);
+  }
+
+  // For other types, return as-is
+  return schema;
 }
