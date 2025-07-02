@@ -8,8 +8,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Issue #46: LLM Provider Schema Compatibility Issue
+
 ### Changed
-- Additional handling for OpenAI's strict schema specification
+- Automatic JSON schema transformations were removed and a new option was introduced
+  to specify the target LLM provider, ensuring full compatibility with the target model
+
+### Added
+- Option to specify provider-specific JSON schema transformations
 
 
 ## [0.2.9] - 2025-06-24

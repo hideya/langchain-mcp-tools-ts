@@ -230,7 +230,7 @@ export async function test(): Promise<void> {
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
     // const query = "Tell me about my Notion account"
-    const query = "Can you give me one of today's news in Tokyo?"
+    const query = "Today's news in Tokyo?"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
