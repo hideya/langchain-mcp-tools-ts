@@ -12,8 +12,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Issue #46: LLM Provider Schema Compatibility Issue
 
 ### Changed
-- Automatic JSON schema transformations were removed and a new option was introduced
-  to specify the target LLM provider, ensuring full compatibility with the target model
+- Remove automatic JSON schema transformations
+- Introduce a new option to specify the target LLM provider and ensure full compatibility with the target model
+- Update REAMDE.md accordingly
+- Separate out the transport-related supporting functions into src/transport-utils.ts
 
 ### Added
 - Option to specify provider-specific JSON schema transformations
@@ -24,7 +26,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Replace @n8n/json-schema-to-zod with the version that includes the ESM fix
 - Update Node.js prerequisites from 16+ to 18+
-- Updated dependencies
+- Update dependencies
 
 ## Fixed
 - Ensure `makeZodSchemaOpenAICompatible()` works even when schema.shape is undefined
