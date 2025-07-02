@@ -105,16 +105,16 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      // notion: {
-      //   "command": "npx",
-      //   "args": ["-y", "@notionhq/notion-mcp-server"],
-      //   "env": {
-      //     // Although the following implies that this MCP server is designed for
-      //     // OpenAI LLMs, it works fine with others models.
-      //     // Tested Claude and Gemini (with schema adjustments).
-      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-      //   },
-      // },
+      notion: {
+        "command": "npx",
+        "args": ["-y", "@notionhq/notion-mcp-server"],
+        "env": {
+          // Although the following implies that this MCP server is designed for
+          // OpenAI LLMs, it works fine with others models.
+          // Tested Claude and Gemini (with schema adjustments).
+          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+        },
+      },
 
       // "notion": {
       //   "command": "npx",
@@ -218,7 +218,7 @@ export async function test(): Promise<void> {
     console.log("\nLLM model:", llm.constructor.name, llm.model);
     console.log("\x1b[0m");  // reset the color
 
-    const query = "Are there any weather alerts in California?";
+    // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
@@ -229,7 +229,7 @@ export async function test(): Promise<void> {
     //   "increment the coutns by 1, and show all the items in the DB."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
-    // const query = "Tell me about my Notion account"
+    const query = "Tell me about my Notion account"
     // const query = "Today's news in Tokyo?"
 
     console.log("\x1b[33m");  // color to yellow
