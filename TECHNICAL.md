@@ -30,16 +30,16 @@ that work across both OpenAI and Google Gemini API.
 
 In addition, there are MCP servers that have issues with those requirements/restrictions.
 
-For example, the official Notion MCP server
+For example, as of Jul 2, 2025, the official Notion MCP server
 [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server)
-generates many warnings like the following with OpenAI's LLMs (as of Jul 2, 2025):
+generates many warnings like the following with OpenAI's LLMs:
 
 ```
 Zod field at `#/definitions/API-get-users/properties/start_cursor` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
 ...
 ```
 
-Besides Gemini fails to work with it with the following error:
+Besides, Gemini fails to work with it with the following error:
 
 ```
 GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] Invalid JSON payload received. Unknown name "const" at 'tools[0].function_declarations[6].parameters.properties[1].value.items.properties[0].value.properties[0].value.items.properties[1].value': Cannot find field.
@@ -78,5 +78,10 @@ When the option is not given, it uses the schema as is:
       mcpServers
     );
 ```
+
+Claude seems to have very relaxed schema requirements
+and hasn't encountered any issues so far.
+I haven't seen any official documentation that mentions specific
+schema validation requirements.
 
 ---

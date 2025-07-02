@@ -105,16 +105,16 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      notion: {
-        "command": "npx",
-        "args": ["-y", "@notionhq/notion-mcp-server"],
-        "env": {
-          // Although the following implies that this MCP server is designed for
-          // OpenAI LLMs, it works fine with others models.
-          // Tested Claude and Gemini (with schema adjustments).
-          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-        },
-      },
+      // notion: {
+      //   "command": "npx",
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "env": {
+      //     // Although the following implies that this MCP server is designed for
+      //     // OpenAI LLMs, it works fine with others models.
+      //     // Tested Claude and Gemini (with schema adjustments).
+      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+      //   },
+      // },
 
       // "notion": {
       //   "command": "npx",

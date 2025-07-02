@@ -713,10 +713,11 @@ async function convertSingleMcpToLangchainTools(
         // and hasn't encountered any issues so far.
         // I haven't seen any official documentation that mentions specific
         // schema validation requirements.
+        // Claude is tested to work fine with passing the JSON schema directly.
 
       } else {
-        // Take a conservative approach to passing the Zod schema.
-        // It's old, but well exercised.
+        // Take a conservative approach and use the Zod-converted schema.
+        // It's an old way, but well exercised.
         processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
       }
       
