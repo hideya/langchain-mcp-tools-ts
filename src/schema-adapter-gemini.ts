@@ -14,6 +14,7 @@
  * For the OpenAPI 3.0 subset limitations vs full JSON Schema
  *    see: https://ai.google.dev/gemini-api/docs/structured-output
  */
+
 interface JsonSchema {
   [key: string]: any;
 }
@@ -53,6 +54,8 @@ interface TransformationTracker {
   typeArraysConverted: number;
   formatsRemoved: string[];
   exclusiveBoundsConverted: number;
+  requiredFieldsFiltered: number;
+  anyOfVariantsFixed: number;
 }
 
 export function makeJsonSchemaGeminiCompatible(
@@ -66,6 +69,8 @@ export function makeJsonSchemaGeminiCompatible(
     typeArraysConverted: 0,
     formatsRemoved: [],
     exclusiveBoundsConverted: 0,
+    requiredFieldsFiltered: 0,
+    anyOfVariantsFixed: 0,
   };
 
   const result = transformSchemaInternal(schema, defsContext, tracker);
@@ -75,6 +80,66 @@ export function makeJsonSchemaGeminiCompatible(
     wasTransformed: getTotalChanges(tracker) > 0,
     changesSummary: generateChangesSummary(tracker),
   };
+}
+
+/**
+ * Validates that required fields only reference properties that actually exist
+ * This addresses the core Gemini validation error you're experiencing
+ */
+function validateAndFilterRequired(
+  required: string[] | undefined,
+  properties: Record<string, any> | undefined,
+  tracker: TransformationTracker
+): string[] | undefined {
+  if (!required || !Array.isArray(required)) {
+    return required;
+  }
+  
+  if (!properties) {
+    // If no properties but required exists, remove required entirely
+    if (required.length > 0) {
+      tracker.requiredFieldsFiltered += required.length;
+    }
+    return undefined;
+  }
+  
+  const validRequired = required.filter(fieldName => properties.hasOwnProperty(fieldName));
+  const filteredCount = required.length - validRequired.length;
+  
+  if (filteredCount > 0) {
+    tracker.requiredFieldsFiltered += filteredCount;
+  }
+  
+  return validRequired.length > 0 ? validRequired : undefined;
+}
+
+/**
+ * Ensures each anyOf variant is independently valid according to Gemini rules
+ */
+function transformAnyOfVariants(
+  anyOf: JsonSchema[],
+  defsContext: Record<string, JsonSchema>,
+  tracker: TransformationTracker
+): GeminiCompatibleSchema[] {
+  return anyOf.map((variant, index) => {
+    const transformedVariant = transformSchemaInternal(variant, defsContext, tracker);
+    
+    // Special validation for anyOf variants
+    if (transformedVariant.type === 'object' && transformedVariant.required) {
+      const originalRequired = transformedVariant.required;
+      transformedVariant.required = validateAndFilterRequired(
+        transformedVariant.required,
+        transformedVariant.properties,
+        tracker
+      );
+      
+      if (originalRequired && originalRequired.length !== (transformedVariant.required?.length || 0)) {
+        tracker.anyOfVariantsFixed++;
+      }
+    }
+    
+    return transformedVariant;
+  });
 }
 
 function transformSchemaInternal(
@@ -157,6 +222,7 @@ function transformSchemaInternal(
       tracker.formatsRemoved.push(`${schema.format} (${result.type})`);
     }
   }
+
   // Copy other basic supported fields
   if (schema.description) result.description = schema.description;
   if (schema.enum) result.enum = schema.enum;
@@ -203,15 +269,14 @@ function transformSchemaInternal(
     }
   }
 
+  // CRITICAL FIX: Validate required fields against actual properties
   if (Array.isArray(schema.required)) {
-    result.required = schema.required;
+    result.required = validateAndFilterRequired(schema.required, result.properties, tracker);
   }
 
   // Handle anyOf (supported) but convert allOf/oneOf to anyOf
   if (schema.anyOf) {
-    result.anyOf = schema.anyOf.map((s: JsonSchema) => 
-      transformSchemaInternal(s, defsContext, tracker)
-    );
+    result.anyOf = transformAnyOfVariants(schema.anyOf, defsContext, tracker);
   } else if (schema.allOf) {
     tracker.fieldsConverted.push('allOf → object merge');
     // Convert allOf to object merge (best effort)
@@ -229,9 +294,7 @@ function transformSchemaInternal(
   } else if (schema.oneOf) {
     tracker.fieldsConverted.push('oneOf → anyOf');
     // Convert oneOf to anyOf (less strict)
-    result.anyOf = schema.oneOf.map((s: JsonSchema) => 
-      transformSchemaInternal(s, defsContext, tracker)
-    );
+    result.anyOf = transformAnyOfVariants(schema.oneOf, defsContext, tracker);
   }
 
   // Track removal of unsupported fields
@@ -257,7 +320,9 @@ function getTotalChanges(tracker: TransformationTracker): number {
          tracker.referencesResolved + 
          tracker.typeArraysConverted + 
          tracker.formatsRemoved.length + 
-         tracker.exclusiveBoundsConverted;
+         tracker.exclusiveBoundsConverted +
+         tracker.requiredFieldsFiltered +
+         tracker.anyOfVariantsFixed;
 }
 
 function generateChangesSummary(tracker: TransformationTracker): string {
@@ -273,6 +338,14 @@ function generateChangesSummary(tracker: TransformationTracker): string {
   
   if (tracker.exclusiveBoundsConverted > 0) {
     changes.push(`${tracker.exclusiveBoundsConverted} exclusive bound(s) converted`);
+  }
+  
+  if (tracker.requiredFieldsFiltered > 0) {
+    changes.push(`${tracker.requiredFieldsFiltered} invalid required field(s) filtered`);
+  }
+  
+  if (tracker.anyOfVariantsFixed > 0) {
+    changes.push(`${tracker.anyOfVariantsFixed} anyOf variant(s) fixed`);
   }
   
   if (tracker.formatsRemoved.length > 0) {
@@ -321,7 +394,8 @@ export function transformMcpToolForGemini(mcpTool: any) {
 }
 
 /**
- * Utility to validate that a schema only uses Gemini-supported fields
+ * Enhanced utility to validate that a schema only uses Gemini-supported fields
+ * and follows all Gemini validation rules
  */
 export function validateGeminiSchema(schema: any, path = ''): string[] {
   const errors: string[] = [];
@@ -337,6 +411,19 @@ export function validateGeminiSchema(schema: any, path = ''): string[] {
     
     if (!supportedFields.has(key)) {
       errors.push(`Unsupported field '${key}' at ${currentPath}`);
+    }
+
+    // Enhanced validation: Check required vs properties consistency
+    if (key === 'required' && Array.isArray(value) && schema.properties) {
+      const invalidRequired = value.filter(reqField => !schema.properties.hasOwnProperty(reqField));
+      if (invalidRequired.length > 0) {
+        errors.push(`Required field(s) [${invalidRequired.join(', ')}] not found in properties at ${currentPath}`);
+      }
+    }
+
+    // Enhanced validation: Required only allowed for object type
+    if (key === 'required' && schema.type !== 'object') {
+      errors.push(`Required field only allowed for object type, found ${schema.type} at ${currentPath}`);
     }
 
     // Recursively validate nested schemas

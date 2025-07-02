@@ -219,7 +219,7 @@ export async function test(): Promise<void> {
     //   "increment the coutns by 1, and show all the items in the DB."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
-    const query = "Tell me Notion user information"
+    const query = "Tell me about my Notion account"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
