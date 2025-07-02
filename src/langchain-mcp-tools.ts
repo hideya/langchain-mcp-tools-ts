@@ -106,7 +106,13 @@ export interface McpServersConfig {
   [key: string]: SingleMcpServerConfig;
 }
 
-// Define a domain-specific logger interface
+/**
+ * Logger interface for MCP tools operations.
+ * Provides structured logging capabilities for debugging and monitoring
+ * MCP server connections and tool executions.
+ *
+ * @public
+ */
 export interface McpToolsLogger {
   debug(...args: unknown[]): void;
   info(...args: unknown[]): void;
@@ -116,18 +122,42 @@ export interface McpToolsLogger {
 
 /**
  * Options for configuring logging behavior.
+ * Controls the verbosity level of logging output during MCP operations.
  *
  * @public
  */
 export interface LogOptions {
+  /** Log verbosity level. Higher levels include all lower levels (e.g., "debug" includes "info", "warn", "error", "fatal") */
   logLevel?: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
 }
 
+/**
+ * Supported LLM providers for schema transformations.
+ * Each provider has specific JSON schema requirements that may conflict with MCP tool schemas.
+ *
+ * @public
+ */
 export type LlmProvider = "openai" | "google_gemini" | "google_genai" | "anthropic" | "auto";
+
+/**
+ * Configuration options for converting MCP servers to LangChain tools.
+ * Extends LogOptions to include provider-specific schema transformations and custom logging.
+ *
+ * @public
+ */
 export interface ConvertMcpToLangchainOptions extends LogOptions {
+  /** Custom logger implementation. If not provided, uses default Logger with specified logLevel */
   logger?: McpToolsLogger;
+  /** LLM provider for schema compatibility transformations. Performs provider-specific JSON schema modifications to prevent compatibility issues */
   llmProvider?: LlmProvider;
 }
+
+/**
+ * Cleanup function returned by convertMcpToLangchainTools.
+ * Properly terminates all MCP server connections and cleans up resources.
+ *
+ * @public
+ */
 export interface McpServerCleanupFn {
   (): Promise<void>;
 }
@@ -170,6 +200,10 @@ export class McpInitializationError extends Error implements McpError {
  * @param options.logLevel - Log verbosity level ("fatal" | "error" | "warn" | "info" | "debug" | "trace")
  * @param options.logger - Custom logger implementation that follows the McpToolsLogger interface.
  *                        If provided, overrides the default Logger instance.
+ * @param options.llmProvider - LLM provider for schema compatibility transformations.
+ *                             Performs provider-specific JSON schema modifications to prevent compatibility issues.
+ *                             Set to "openai" for OpenAI models, "google_gemini"/"google_genai" for Google models,
+ *                             "anthropic" for Claude models, or "auto" for automatic detection.
  *
  * @returns A promise that resolves to:
  *          - tools: Array of StructuredTool instances ready for use with LangChain
@@ -181,12 +215,16 @@ export class McpInitializationError extends Error implements McpError {
  * @remarks
  * - Servers are initialized concurrently for better performance
  * - Configuration is validated and will throw errors for conflicts (e.g., both url and command specified)
+ * - Schema transformations are applied based on llmProvider to ensure compatibility
  * - The cleanup function continues with remaining servers even if some cleanup operations fail
  *
  * @example
  * const { tools, cleanup } = await convertMcpToLangchainTools({
  *   filesystem: { command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "."] },
  *   fetch: { command: "uvx", args: ["mcp-server-fetch"] }
+ * }, {
+ *   llmProvider: "openai",
+ *   logLevel: "debug"
  * });
  */
 export async function convertMcpToLangchainTools(
@@ -536,10 +574,11 @@ async function createHttpTransportWithFallback(
 /**
  * Initializes a single MCP server and converts its capabilities into LangChain tools.
  * Sets up a connection to the server, retrieves available tools, and creates corresponding
- * LangChain tool instances.
+ * LangChain tool instances with optional schema transformations for LLM compatibility.
  *
  * @param serverName - Unique identifier for the server instance
  * @param config - Server configuration including command, arguments, and environment variables
+ * @param llmProvider - LLM provider for schema compatibility transformations (defaults to "auto")
  * @param logger - McpToolsLogger instance for recording operation details
  *
  * @returns A promise that resolves to:
@@ -684,9 +723,13 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
 
+      // Apply LLM provider-specific schema transformations to ensure compatibility
+      // Different LLM providers have incompatible JSON Schema requirements for function calling
       let processedSchema: ToolSchemaBase = tool.inputSchema;
       
       if (llmProvider === "openai") {
+        // OpenAI requires optional fields to be nullable (.optional() + .nullable())
+        // Transform schema to meet OpenAI's requirements
         const result = makeJsonSchemaOpenAICompatible(processedSchema);
         if (result.wasTransformed) {
           logger.info(`MCP server "${serverName}/${tool.name}"`, 
@@ -700,6 +743,8 @@ async function convertSingleMcpToLangchainTools(
         processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
 
       } else if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
+        // Google Gemini API rejects nullable fields and requires strict OpenAPI 3.0 subset compliance
+        // Transform schema to meet Gemini's strict requirements
         const result = makeJsonSchemaGeminiCompatible(processedSchema);
         if (result.wasTransformed) {
           logger.info(`MCP server "${serverName}/${tool.name}"`, 
@@ -708,15 +753,13 @@ async function convertSingleMcpToLangchainTools(
         processedSchema = result.schema;
 
       } else if (llmProvider === "anthropic") {
-        // Claude seems to have very relaxed schema requirements
-        // and hasn't encountered any issues so far.
-        // I haven't seen any official documentation that mentions specific
-        // schema validation requirements.
-        // Claude is tested to work fine with passing the JSON schema directly.
+        // Anthropic Claude has very relaxed schema requirements with no documented restrictions
+        // No schema modifications needed
+        // Claude is tested to work fine with passing the JSON schema directly
 
       } else {
-        // Take a conservative approach and use the Zod-converted schema.
-        // It's an old way, but well exercised.
+        // Take a conservative approach and use the Zod-converted schema
+        // It's an old way, but well exercised
         processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
       }
       
