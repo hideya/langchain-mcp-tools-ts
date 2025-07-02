@@ -37,32 +37,32 @@ export async function test(): Promise<void> {
 
   try {
     const mcpServers: McpServersConfig = {
-      filesystem: {
-        // transport: "stdio",  // optional
-        // type: "stdio",  // optional: VSCode-style config works too
-        command: "npx",
-        args: [
-          "-y",
-          "@modelcontextprotocol/server-filesystem",
-          "."  // path to a directory to allow access to
-        ],
-        // cwd: "/tmp"  // the working directory to be use by the server
-      },
+      // filesystem: {
+      //   // transport: "stdio",  // optional
+      //   // type: "stdio",  // optional: VSCode-style config works too
+      //   command: "npx",
+      //   args: [
+      //     "-y",
+      //     "@modelcontextprotocol/server-filesystem",
+      //     "."  // path to a directory to allow access to
+      //   ],
+      //   // cwd: "/tmp"  // the working directory to be use by the server
+      // },
 
-      fetch: {
-        command: "uvx",
-        args: [
-          "mcp-server-fetch"
-        ]
-      },
+      // fetch: {
+      //   command: "uvx",
+      //   args: [
+      //     "mcp-server-fetch"
+      //   ]
+      // },
 
-      weather: {
-        command: "npx",
-        args: [
-          "-y",
-         "@h1deya/mcp-server-weather"
-        ]
-      },
+      // weather: {
+      //   command: "npx",
+      //   args: [
+      //     "-y",
+      //    "@h1deya/mcp-server-weather"
+      //   ]
+      // },
       
       // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
       // weather: {
@@ -87,21 +87,21 @@ export async function test(): Promise<void> {
       //   // optionally `transport: "ws"` or `type: "ws"`
       // },
 
-      // "notion": {
-      //   "command": "npx",
-      //   "args": ["-y", "@suekou/mcp-notion-server"],
-      //   "env": {
-      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
-      //   }
-      // },
-
-      notion: {
+      "notion": {
         "command": "npx",
-        "args": ["-y", "@notionhq/notion-mcp-server"],
+        "args": ["-y", "@suekou/mcp-notion-server"],
         "env": {
-          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-        },
+          "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
+        }
       },
+
+      // notion: {
+      //   "command": "npx",
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "env": {
+      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+      //   },
+      // },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -170,8 +170,8 @@ export async function test(): Promise<void> {
         logger: new SimpleConsoleLogger(),
         // llmProvider: "anthropic",
         // llmProvider: "openai",
-        // llmProvider: "google_gemini",
-        llmProvider: "google_genai",
+        llmProvider: "google_gemini",
+        // llmProvider: "google_genai",
       }
     );
 
@@ -210,7 +210,7 @@ export async function test(): Promise<void> {
 
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
-    const query = "Read and briefly summarize the LICENSE file";
+    // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me how many of directories in `.`";
     // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
@@ -219,7 +219,7 @@ export async function test(): Promise<void> {
     //   "increment the coutns by 1, and show all the items in the DB."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
-    // const query = "Tell me Notion user information"
+    const query = "Tell me Notion user information"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
