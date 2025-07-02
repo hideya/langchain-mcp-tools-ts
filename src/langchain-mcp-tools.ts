@@ -1,6 +1,6 @@
 import { IOType } from "node:child_process";
 import { Stream } from "node:stream";
-import { DynamicStructuredTool, StructuredTool, ToolInputSchemaBase } from "@langchain/core/tools";
+import { DynamicStructuredTool, StructuredTool, ToolSchemaBase } from "@langchain/core/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport, SSEClientTransportOptions } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport,
@@ -12,8 +12,7 @@ import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/webso
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { jsonSchemaToZod } from "@h1deya/json-schema-to-zod";
-import { ZodTypeAny } from "zod";
+import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 
 import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
 import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
@@ -678,7 +677,7 @@ async function convertSingleMcpToLangchainTools(
       // const llmProvider = "openai";
       const llmProvider = "google_gemini";
 
-      let processedSchema: ToolInputSchemaBase = tool.inputSchema;
+      let processedSchema: ToolSchemaBase = tool.inputSchema;
       
       if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
         const result = makeJsonSchemaGeminiCompatible(processedSchema);
@@ -689,7 +688,7 @@ async function convertSingleMcpToLangchainTools(
 
       } else if (llmProvider === "openai") {
         processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
-        processedSchema = jsonSchemaToZod(processedSchema);
+        processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
       }
       
       return new DynamicStructuredTool({
