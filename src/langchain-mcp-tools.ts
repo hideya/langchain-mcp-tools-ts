@@ -674,50 +674,16 @@ async function convertSingleMcpToLangchainTools(
     );
 
     const tools = toolsResponse.tools.map((tool) => {
-
-      let processedSchema = tool.inputSchema;
-
+      
       // const result = makeJsonSchemaGeminiCompatible(tool.inputSchema);
       // if (result.wasTransformed) {
       //   logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
       // }
       // let processedSchema = result.schema;
 
-      // const result = makeJsonSchemaOpenAICompatible(tool.inputSchema);
-      // if (result.wasTransformed) {
-      //   logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for OpenAI: ", result.changesSummary);
-      // }
-      // let processedSchema = result.schema;
-
-      // // **KEY FIX**: Use OpenAI-compatible Zod converter
-      // let zodSchema;
-      // try {
-      //   // First try the custom OpenAI-compatible converter
-      //   zodSchema = jsonSchemaToZodForOpenAI(processedSchema, { name: tool.name });
-        
-      //   // Additional transformation to ensure no .optional() without .nullable()
-      //   zodSchema = transformZodSchemaForOpenAI(zodSchema);
-        
-      //   logger.debug(`MCP server "${serverName}/${tool.name}": Created OpenAI-compatible Zod schema`);
-      // } catch (error) {
-      //   logger.warn(`MCP server "${serverName}/${tool.name}": OpenAI Zod conversion failed, falling back to standard converter:`, error);
-        
-      //   // Fallback to the original converter if the new one fails
-      //   zodSchema = jsonSchemaToZod(processedSchema);
-        
-      //   // Try to transform it to be OpenAI compatible
-      //   try {
-      //     zodSchema = transformZodSchemaForOpenAI(zodSchema);
-      //     logger.info(`MCP server "${serverName}/${tool.name}": Applied OpenAI compatibility transform to fallback schema`);
-      //   } catch (transformError) {
-      //     logger.warn(`MCP server "${serverName}/${tool.name}": Could not make fallback schema OpenAI compatible:`, transformError);
-      //   }
-      // }
-
-      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+      let processedSchema = makeJsonSchemaOpenAICompatible(tool.inputSchema);
 
       let zodSchema = jsonSchemaToZod(processedSchema);
-      // zodSchema = safeTransformZodForOpenAI(zodSchema);
       
       return new DynamicStructuredTool({
         name: tool.name,
