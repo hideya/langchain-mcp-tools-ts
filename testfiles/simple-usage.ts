@@ -49,20 +49,20 @@ export async function test(): Promise<void> {
         // cwd: "/tmp"  // the working directory to be use by the server
       },
 
-      // fetch: {
-      //   command: "uvx",
-      //   args: [
-      //     "mcp-server-fetch"
-      //   ]
-      // },
+      fetch: {
+        command: "uvx",
+        args: [
+          "mcp-server-fetch"
+        ]
+      },
 
-      // weather: {
-      //   command: "npx",
-      //   args: [
-      //     "-y",
-      //    "@h1deya/mcp-server-weather"
-      //   ]
-      // },
+      weather: {
+        command: "npx",
+        args: [
+          "-y",
+         "@h1deya/mcp-server-weather"
+        ]
+      },
       
       // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
       // weather: {
@@ -95,13 +95,13 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      // notion: {
-      //   "command": "npx",
-      //   "args": ["-y", "@notionhq/notion-mcp-server"],
-      //   "env": {
-      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-      //   },
-      // },
+      notion: {
+        "command": "npx",
+        "args": ["-y", "@notionhq/notion-mcp-server"],
+        "env": {
+          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+        },
+      },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server

@@ -1,6 +1,6 @@
 import { IOType } from "node:child_process";
 import { Stream } from "node:stream";
-import { DynamicStructuredTool, StructuredTool } from "@langchain/core/tools";
+import { DynamicStructuredTool, StructuredTool, ToolInputSchemaBase } from "@langchain/core/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport, SSEClientTransportOptions } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport,
@@ -13,12 +13,11 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod } from "@h1deya/json-schema-to-zod";
+import { ZodTypeAny } from "zod";
+
 import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
 import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
-// import { jsonSchemaToZodForOpenAI, safeTransformZodForOpenAI } from "./openai-zod-converter.js";
-import { jsonSchemaToZodForOpenAI } from "./openai-zod-converter.js";
 import { Logger } from "./logger.js";
-
 
 /**
  * Configuration for a command-line based MCP server.
@@ -674,22 +673,22 @@ async function convertSingleMcpToLangchainTools(
     );
 
     const tools = toolsResponse.tools.map((tool) => {
+
+      let processedSchema: ToolInputSchemaBase = tool.inputSchema;
       
-      // const result = makeJsonSchemaGeminiCompatible(tool.inputSchema);
+      // const result = makeJsonSchemaGeminiCompatible(processedSchema);
       // if (result.wasTransformed) {
       //   logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
       // }
-      // let processedSchema = result.schema;
+      // processedSchema = result.schema;
 
-      let processedSchema = makeJsonSchemaOpenAICompatible(tool.inputSchema);
-
-      let zodSchema = jsonSchemaToZod(processedSchema);
+      processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+      processedSchema = jsonSchemaToZod(processedSchema);
       
       return new DynamicStructuredTool({
         name: tool.name,
         description: tool.description || "",
-        // schema: processedSchema,
-        schema: zodSchema,
+        schema: processedSchema,
 
         func: async function(input) {
           logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
