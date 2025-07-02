@@ -166,7 +166,13 @@ export async function test(): Promise<void> {
     // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
     // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, { logLevel: "debug" });
     const { tools, cleanup } = await convertMcpToLangchainTools(
-      mcpServers, { logger: new SimpleConsoleLogger() }
+      mcpServers, {
+        logger: new SimpleConsoleLogger(),
+        // llmProvider: "anthropic",
+        // llmProvider: "openai",
+        // llmProvider: "google_gemini",
+        llmProvider: "google_genai",
+      }
     );
 
     mcpCleanup = cleanup

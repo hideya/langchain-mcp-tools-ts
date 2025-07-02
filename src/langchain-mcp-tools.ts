@@ -123,6 +123,12 @@ export interface LogOptions {
   logLevel?: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
 }
 
+export type LlmProvider = "openai" | "google_gemini" | "google_genai" | "anthropic" | "auto";
+export interface ConvertMcpToLangchainOptions extends LogOptions {
+  logger?: McpToolsLogger;
+  llmProvider?: LlmProvider;
+}
+
 /**
  * Error interface for MCP-related errors.
  * Extends the standard Error interface with MCP-specific properties.
@@ -186,7 +192,7 @@ export class McpInitializationError extends Error implements McpError {
  */
 export async function convertMcpToLangchainTools(
   configs: McpServersConfig,
-  options?: LogOptions & { logger?: McpToolsLogger }
+  options?: ConvertMcpToLangchainOptions
 ): Promise<{
   tools: StructuredTool[];
   cleanup: McpServerCleanupFn;
@@ -194,9 +200,14 @@ export async function convertMcpToLangchainTools(
   const allTools: StructuredTool[] = [];
   const cleanupCallbacks: McpServerCleanupFn[] = [];
   const logger = options?.logger || new Logger({ level: options?.logLevel || "info" }) as McpToolsLogger;
+  const llmProvider = options?.llmProvider;
+
+  if (llmProvider) {
+    logger.info(`Converting MCP tool schemas for LLM Provider: ${llmProvider}`);
+  }
 
   const serverInitPromises = Object.entries(configs).map(async ([name, config]) => {
-    const result = await convertSingleMcpToLangchainTools(name, config, logger);
+    const result = await convertSingleMcpToLangchainTools(name, config, llmProvider, logger);
     return { name, result };
   });
 
@@ -544,6 +555,7 @@ async function createHttpTransportWithFallback(
 async function convertSingleMcpToLangchainTools(
   serverName: string,
   config: SingleMcpServerConfig,
+  llmProvider: LlmProvider = "auto",
   logger: McpToolsLogger
 ): Promise<{
   tools: StructuredTool[];
@@ -571,7 +583,7 @@ async function convertSingleMcpToLangchainTools(
     if (config?.command && url) {
       throw new McpInitializationError(
         serverName,
-        `Configuration error: Cannot specify both 'command' (${config.command}) and 'url' (${url.href}). Use 'command' for local servers or 'url' for remote servers.`
+        `Configuration error: Cannot specify both 'command' (${config.command}) and 'url' (${url.href})`
       );
     }
 
@@ -673,21 +685,30 @@ async function convertSingleMcpToLangchainTools(
 
     const tools = toolsResponse.tools.map((tool) => {
 
-      // const llmProvider = undefined;
-      // const llmProvider = "openai";
-      const llmProvider = "google_gemini";
-
       let processedSchema: ToolSchemaBase = tool.inputSchema;
       
-      if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
+      if (llmProvider === "openai") {
+        processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+        // Although the following issue was marked as completed, somehow
+        // I am still experiencing the same difficulties as of July 2, 2025...
+        //   https://github.com/langchain-ai/langchainjs/issues/6623
+        // The following is a workaround to avoid the error
+        processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
+
+      } else if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
         const result = makeJsonSchemaGeminiCompatible(processedSchema);
         if (result.wasTransformed) {
-          logger.info(`MCP server "${serverName}/${tool.name}"`, "Schema transformed for Gemini: ", result.changesSummary);
+          logger.info(`MCP server "${serverName}/${tool.name}"`, 
+            "Schema transformed for Gemini: ", result.changesSummary);
         }
         processedSchema = result.schema;
 
-      } else if (llmProvider === "openai") {
-        processedSchema = makeJsonSchemaOpenAICompatible(processedSchema);
+      } else if (llmProvider === "anthropic") {
+        // Claude seems open-minded about the schema
+        // Tested the newly introduced direct JSON schema passing
+
+      } else {
+        // Take a conservative approach to passing the Zod schema the old way
         processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
       }
       
