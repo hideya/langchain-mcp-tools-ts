@@ -24,8 +24,8 @@ export async function test(): Promise<void> {
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the others.
 
-  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
-  //   "SSE",  "npx -y @h1deya/mcp-server-weather");
+  const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
+    "SSE",  "npx -y @h1deya/mcp-server-weather");
 
   // // NOTE: without the following line, I got this error:
   // //   ReferenceError: WebSocket is not defined
@@ -64,10 +64,10 @@ export async function test(): Promise<void> {
       //   ]
       // },
       
-      // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
-      // weather: {
-      //   url: `http://localhost:${sseServerPort}/sse`
-      // },
+      // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
+      weather: {
+        url: `http://localhost:${sseServerPort}/sse`
+      },
       
       // // THIS DOESN'T WORK: Example of explicit transport selection:
       // weather: {
@@ -87,12 +87,12 @@ export async function test(): Promise<void> {
       //   // optionally `transport: "ws"` or `type: "ws"`
       // },
 
-      // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
-      "brave-search": {
-          "command": "npx",
-          "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
-          "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
-      },
+      // // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
+      // "brave-search": {
+      //     "command": "npx",
+      //     "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
+      //     "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+      // },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -218,11 +218,11 @@ export async function test(): Promise<void> {
     console.log("\nLLM model:", llm.constructor.name, llm.model);
     console.log("\x1b[0m");  // reset the color
 
+    const query = "Are there any weather alerts in California?";
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me how many of directories in `.`";
-    // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +
@@ -230,7 +230,7 @@ export async function test(): Promise<void> {
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
     // const query = "Tell me about my Notion account"
-    const query = "Today's news in Tokyo?"
+    // const query = "Today's news in Tokyo?"
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
