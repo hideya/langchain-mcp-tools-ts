@@ -115,35 +115,48 @@ function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTrac
   }
 
   // Handle array items
-  if (result.items) {
-    if (Array.isArray(result.items)) {
-      result.items = result.items.map((item: JsonSchema, index: number) => {
+  if (Array.isArray(result.items)) {
+    if (result.items) {
+      if (Array.isArray(result.items)) {
+        result.items = result.items.map((item: JsonSchema, index: number) => {
+          tracker.nestedSchemasProcessed++;
+          return transformSchemaInternal(item, tracker, `${path}.items[${index}]`);
+        });
+      } else {
         tracker.nestedSchemasProcessed++;
-        return transformSchemaInternal(item, tracker, `${path}.items[${index}]`);
-      });
-    } else {
-      tracker.nestedSchemasProcessed++;
-      result.items = transformSchemaInternal(result.items, tracker, `${path}.items`);
+        result.items = transformSchemaInternal(result.items, tracker, `${path}.items`);
+      }
     }
   }
 
   // Handle additionalProperties
-  if (result.additionalProperties && typeof result.additionalProperties === "object") {
+  if (result.additionalProperties && 
+    typeof result.additionalProperties === "object" && 
+    result.additionalProperties !== null) {
     tracker.nestedSchemasProcessed++;
-    result.additionalProperties = transformSchemaInternal(result.additionalProperties, tracker, `${path}.additionalProperties`);
+    result.additionalProperties = transformSchemaInternal(
+      result.additionalProperties as JsonSchema, 
+      tracker, 
+      `${path}.additionalProperties`
+    );
   }
 
   // Handle definitions (common in complex schemas)
   if (result.definitions || result.$defs) {
     const defsKey = result.definitions ? 'definitions' : '$defs';
-    const processedDefs: Record<string, JsonSchema> = {};
+    const defsValue = result[defsKey];
     
-    for (const [key, defSchema] of Object.entries(result[defsKey])) {
-      tracker.nestedSchemasProcessed++;
-      processedDefs[key] = transformSchemaInternal(defSchema, tracker, `${path}.${defsKey}.${key}`);
+    // Type guard: ensure it's an object we can iterate over
+    if (defsValue && typeof defsValue === "object" && defsValue !== null && !Array.isArray(defsValue)) {
+      const processedDefs: Record<string, JsonSchema> = {};
+      
+      for (const [key, defSchema] of Object.entries(defsValue)) {
+        tracker.nestedSchemasProcessed++;
+        processedDefs[key] = transformSchemaInternal(defSchema as JsonSchema, tracker, `${path}.${defsKey}.${key}`);
+      }
+      
+      result[defsKey] = processedDefs;
     }
-    
-    result[defsKey] = processedDefs;
   }
 
   return result;
