@@ -18,8 +18,10 @@
  *    see: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
  */
 
+type JsonSchema = Record<string, unknown>;
+
 interface TransformResult {
-  schema: any;
+  schema: JsonSchema;
   wasTransformed: boolean;
   changesSummary?: string;
 }
@@ -31,7 +33,7 @@ interface TransformationTracker {
   nestedSchemasProcessed: number;
 }
 
-export function makeJsonSchemaOpenAICompatible(schema: any): TransformResult {
+export function makeJsonSchemaOpenAICompatible(schema: JsonSchema): TransformResult {
   const tracker: TransformationTracker = {
     nullableFieldsAdded: [],
     anyOfNullsAdded: [],
@@ -48,7 +50,7 @@ export function makeJsonSchemaOpenAICompatible(schema: any): TransformResult {
   };
 }
 
-function transformSchemaInternal(schema: any, tracker: TransformationTracker, path: string = ''): any {
+function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTracker, path: string = ''): JsonSchema {
   if (typeof schema !== "object" || schema === null) {
     return schema;
   }
@@ -57,7 +59,7 @@ function transformSchemaInternal(schema: any, tracker: TransformationTracker, pa
 
   // Handle object properties
   if (result.properties) {
-    const processedProperties: Record<string, any> = {};
+    const processedProperties: Record<string, JsonSchema> = {};
     const required = new Set(result.required || []);
 
     for (const [key, propSchema] of Object.entries(result.properties)) {
@@ -69,10 +71,10 @@ function transformSchemaInternal(schema: any, tracker: TransformationTracker, pa
         if (processedProp.type && !processedProp.nullable) {
           processedProp.nullable = true;
           tracker.nullableFieldsAdded.push(propPath);
-        } else if (processedProp.anyOf && !processedProp.anyOf.some((s: any) => s.type === "null")) {
+        } else if (processedProp.anyOf && !processedProp.anyOf.some((s: JsonSchema) => s.type === "null")) {
           processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
           tracker.anyOfNullsAdded.push(propPath);
-        } else if (processedProp.oneOf && !processedProp.oneOf.some((s: any) => s.type === "null")) {
+        } else if (processedProp.oneOf && !processedProp.oneOf.some((s: JsonSchema) => s.type === "null")) {
           processedProp.oneOf = [...processedProp.oneOf, { type: "null" }];
           tracker.oneOfNullsAdded.push(propPath);
         }
@@ -86,21 +88,21 @@ function transformSchemaInternal(schema: any, tracker: TransformationTracker, pa
 
   // Handle anyOf/oneOf/allOf recursively
   if (result.anyOf) {
-    result.anyOf = result.anyOf.map((subSchema: any, index: number) => {
+    result.anyOf = result.anyOf.map((subSchema: JsonSchema, index: number) => {
       tracker.nestedSchemasProcessed++;
       return transformSchemaInternal(subSchema, tracker, `${path}.anyOf[${index}]`);
     });
   }
   
   if (result.oneOf) {
-    result.oneOf = result.oneOf.map((subSchema: any, index: number) => {
+    result.oneOf = result.oneOf.map((subSchema: JsonSchema, index: number) => {
       tracker.nestedSchemasProcessed++;
       return transformSchemaInternal(subSchema, tracker, `${path}.oneOf[${index}]`);
     });
   }
   
   if (result.allOf) {
-    result.allOf = result.allOf.map((subSchema: any, index: number) => {
+    result.allOf = result.allOf.map((subSchema: JsonSchema, index: number) => {
       tracker.nestedSchemasProcessed++;
       return transformSchemaInternal(subSchema, tracker, `${path}.allOf[${index}]`);
     });
@@ -109,7 +111,7 @@ function transformSchemaInternal(schema: any, tracker: TransformationTracker, pa
   // Handle array items
   if (result.items) {
     if (Array.isArray(result.items)) {
-      result.items = result.items.map((item: any, index: number) => {
+      result.items = result.items.map((item: JsonSchema, index: number) => {
         tracker.nestedSchemasProcessed++;
         return transformSchemaInternal(item, tracker, `${path}.items[${index}]`);
       });
@@ -128,7 +130,7 @@ function transformSchemaInternal(schema: any, tracker: TransformationTracker, pa
   // Handle definitions (common in complex schemas)
   if (result.definitions || result.$defs) {
     const defsKey = result.definitions ? 'definitions' : '$defs';
-    const processedDefs: Record<string, any> = {};
+    const processedDefs: Record<string, JsonSchema> = {};
     
     for (const [key, defSchema] of Object.entries(result[defsKey])) {
       tracker.nestedSchemasProcessed++;
