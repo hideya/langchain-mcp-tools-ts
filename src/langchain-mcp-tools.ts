@@ -134,7 +134,7 @@ export interface LogOptions {
  *
  * @public
  */
-export type LlmProvider = "openai" | "google_gemini" | "google_genai" | "anthropic" | "auto";
+export type LlmProvider = "openai" | "google_gemini" | "google_genai" | "anthropic" | "none";
 
 /**
  * Configuration options for converting MCP servers to LangChain tools.
@@ -189,110 +189,13 @@ export class McpInitializationError extends Error implements McpError {
 }
 
 /**
- * Initializes multiple MCP (Model Context Protocol) servers and converts them into LangChain tools.
- * This function concurrently sets up all specified servers and aggregates their tools.
- *
- * @param configs - A mapping of server names to their respective configurations
- * @param options - Optional configuration settings
- * @param options.logLevel - Log verbosity level ("fatal" | "error" | "warn" | "info" | "debug" | "trace")
- * @param options.logger - Custom logger implementation that follows the McpToolsLogger interface.
- *                        If provided, overrides the default Logger instance.
- * @param options.llmProvider - LLM provider for schema compatibility transformations.
- *                             Performs provider-specific JSON schema modifications to prevent compatibility issues.
- *                             Set to "openai" for OpenAI models, "google_gemini"/"google_genai" for Google models,
- *                             "anthropic" for Claude models, or "auto" for automatic detection.
- *
- * @returns A promise that resolves to:
- *          - tools: Array of StructuredTool instances ready for use with LangChain
- *          - cleanup: Function to properly terminate all server connections
- *
- * @throws McpInitializationError if any server fails to initialize
- *         (includes connection errors, tool listing failures, configuration validation errors)
- *
- * @remarks
- * - Servers are initialized concurrently for better performance
- * - Configuration is validated and will throw errors for conflicts (e.g., both url and command specified)
- * - Schema transformations are applied based on llmProvider to ensure compatibility
- * - The cleanup function continues with remaining servers even if some cleanup operations fail
- *
- * @example
- * const { tools, cleanup } = await convertMcpToLangchainTools({
- *   filesystem: { command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "."] },
- *   fetch: { command: "uvx", args: ["mcp-server-fetch"] }
- * }, {
- *   llmProvider: "openai",
- *   logLevel: "debug"
- * });
- */
-export async function convertMcpToLangchainTools(
-  configs: McpServersConfig,
-  options?: ConvertMcpToLangchainOptions
-): Promise<{
-  tools: StructuredTool[];
-  cleanup: McpServerCleanupFn;
-}> {
-  const allTools: StructuredTool[] = [];
-  const cleanupCallbacks: McpServerCleanupFn[] = [];
-  const logger = options?.logger || new Logger({ level: options?.logLevel || "info" }) as McpToolsLogger;
-  const llmProvider = options?.llmProvider;
-
-  if (llmProvider) {
-    logger.info(`Converting MCP tool schemas for the LLM Provider: ${llmProvider}`);
-  }
-
-  const serverInitPromises = Object.entries(configs).map(async ([name, config]) => {
-    const result = await convertSingleMcpToLangchainTools(name, config, llmProvider, logger);
-    return { name, result };
-  });
-
-  // Track server names alongside their promises
-  const serverNames = Object.keys(configs);
-
-  // Concurrently initialize all the MCP servers
-  const results = await Promise.allSettled(
-    serverInitPromises
-  );
-
-  // Process successful initializations and log failures
-  results.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      const { result: { tools, cleanup } } = result.value;
-      allTools.push(...tools);
-      cleanupCallbacks.push(cleanup);
-    } else {
-      logger.error(`MCP server "${serverNames[index]}": failed to initialize: ${result.reason.details}`);
-      throw result.reason;
-    }
-  });
-
-  async function cleanup(): Promise<void> {
-    // Concurrently execute all the callbacks
-    const results = await Promise.allSettled(cleanupCallbacks.map(callback => callback()));
-
-    // Log any cleanup failures but continue with others
-    // This ensures that a single server cleanup failure doesn't prevent cleanup of other servers
-    const failures = results.filter(result => result.status === "rejected");
-    failures.forEach((failure, index) => {
-      logger.error(`MCP server "${serverNames[index]}": failed to close: ${failure.reason}`);
-    });
-  }
-
-  logger.info(`MCP servers initialized: ${allTools.length} tool(s) available in total`);
-  allTools.forEach((tool) => logger.debug(`- ${tool.name}`));
-
-  return { tools: allTools, cleanup };
-}
-
-
-
-/**
  * Initializes a single MCP server and converts its capabilities into LangChain tools.
  * Sets up a connection to the server, retrieves available tools, and creates corresponding
  * LangChain tool instances with optional schema transformations for LLM compatibility.
  *
  * @param serverName - Unique identifier for the server instance
  * @param config - Server configuration including command, arguments, and environment variables
- * @param llmProvider - LLM provider for schema compatibility transformations (defaults to "auto")
+ * @param llmProvider - LLM provider for schema compatibility transformations (defaults to "none")
  * @param logger - McpToolsLogger instance for recording operation details
  *
  * @returns A promise that resolves to:
@@ -307,7 +210,7 @@ export async function convertMcpToLangchainTools(
 async function convertSingleMcpToLangchainTools(
   serverName: string,
   config: SingleMcpServerConfig,
-  llmProvider: LlmProvider = "auto",
+  llmProvider: LlmProvider,
   logger: McpToolsLogger
 ): Promise<{
   tools: StructuredTool[];
@@ -560,4 +463,99 @@ async function convertSingleMcpToLangchainTools(
       error
     );
   }
+}
+
+/**
+ * Initializes multiple MCP (Model Context Protocol) servers and converts them into LangChain tools.
+ * This function concurrently sets up all specified servers and aggregates their tools.
+ *
+ * @param configs - A mapping of server names to their respective configurations
+ * @param options - Optional configuration settings
+ * @param options.logLevel - Log verbosity level ("fatal" | "error" | "warn" | "info" | "debug" | "trace")
+ * @param options.logger - Custom logger implementation that follows the McpToolsLogger interface.
+ *                        If provided, overrides the default Logger instance.
+ * @param options.llmProvider - LLM provider for schema compatibility transformations.
+ *                             Performs provider-specific JSON schema modifications to prevent compatibility issues.
+ *                             Set to "openai" for OpenAI models, "google_gemini"/"google_genai" for Google models,
+ *                             "anthropic" for Claude models, or "none" for no transformation.
+ *
+ * @returns A promise that resolves to:
+ *          - tools: Array of StructuredTool instances ready for use with LangChain
+ *          - cleanup: Function to properly terminate all server connections
+ *
+ * @throws McpInitializationError if any server fails to initialize
+ *         (includes connection errors, tool listing failures, configuration validation errors)
+ *
+ * @remarks
+ * - Servers are initialized concurrently for better performance
+ * - Configuration is validated and will throw errors for conflicts (e.g., both url and command specified)
+ * - Schema transformations are applied based on llmProvider to ensure compatibility
+ * - The cleanup function continues with remaining servers even if some cleanup operations fail
+ *
+ * @example
+ * const { tools, cleanup } = await convertMcpToLangchainTools({
+ *   filesystem: { command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "."] },
+ *   fetch: { command: "uvx", args: ["mcp-server-fetch"] }
+ * }, {
+ *   llmProvider: "openai",
+ *   logLevel: "debug"
+ * });
+ */
+export async function convertMcpToLangchainTools(
+  configs: McpServersConfig,
+  options?: ConvertMcpToLangchainOptions
+): Promise<{
+  tools: StructuredTool[];
+  cleanup: McpServerCleanupFn;
+}> {
+  const allTools: StructuredTool[] = [];
+  const cleanupCallbacks: McpServerCleanupFn[] = [];
+  const logger = options?.logger || new Logger({ level: options?.logLevel || "info" }) as McpToolsLogger;
+  const llmProvider = options?.llmProvider || "none";
+
+  if (llmProvider !== "none") {
+    logger.info(`Converting MCP tool schemas for the LLM Provider: ${llmProvider}`);
+  }
+
+  const serverInitPromises = Object.entries(configs).map(async ([name, config]) => {
+    const result = await convertSingleMcpToLangchainTools(name, config, llmProvider, logger);
+    return { name, result };
+  });
+
+  // Track server names alongside their promises
+  const serverNames = Object.keys(configs);
+
+  // Concurrently initialize all the MCP servers
+  const results = await Promise.allSettled(
+    serverInitPromises
+  );
+
+  // Process successful initializations and log failures
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      const { result: { tools, cleanup } } = result.value;
+      allTools.push(...tools);
+      cleanupCallbacks.push(cleanup);
+    } else {
+      logger.error(`MCP server "${serverNames[index]}": failed to initialize: ${result.reason.details}`);
+      throw result.reason;
+    }
+  });
+
+  async function cleanup(): Promise<void> {
+    // Concurrently execute all the callbacks
+    const results = await Promise.allSettled(cleanupCallbacks.map(callback => callback()));
+
+    // Log any cleanup failures but continue with others
+    // This ensures that a single server cleanup failure doesn't prevent cleanup of other servers
+    const failures = results.filter(result => result.status === "rejected");
+    failures.forEach((failure, index) => {
+      logger.error(`MCP server "${serverNames[index]}": failed to close: ${failure.reason}`);
+    });
+  }
+
+  logger.info(`MCP servers initialized: ${allTools.length} tool(s) available in total`);
+  allTools.forEach((tool) => logger.debug(`- ${tool.name}`));
+
+  return { tools: allTools, cleanup };
 }
