@@ -6,7 +6,7 @@ import { StreamableHTTPReconnectionOptions } from "@modelcontextprotocol/sdk/cli
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolResultSchema, ListToolsResultSchema, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 
@@ -263,7 +263,7 @@ function processSchemaForLlmProvider(
  * @internal
  */
 function createLangChainTool(
-  tool: any,  // MCP tool type
+  tool: Tool,
   serverName: string,
   client: Client,
   llmProvider: LlmProvider,

@@ -100,18 +100,24 @@ function is4xxError(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
   }
+
+  // Record<string, unknown> is the TypeScript-approved way to handle
+  // "object but we don't know its shape" scenarios.
+  const errorObj = error as Record<string, unknown>;
   
-  // Check for common error patterns that indicate 4xx responses
-  const errorObj = error as any;
-  
-  // Check if it"s a fetch Response error with status
-  if (errorObj.status && typeof errorObj.status === "number") {
+  // Check if it's a fetch Response error with status
+  if (typeof errorObj.status === "number") {
     return errorObj.status >= 400 && errorObj.status < 500;
   }
   
   // Check if it's wrapped in a Response object
-  if (errorObj.response && errorObj.response.status && typeof errorObj.response.status === "number") {
-    return errorObj.response.status >= 400 && errorObj.response.status < 500;
+  if (errorObj.response && 
+      typeof errorObj.response === "object" && 
+      errorObj.response !== null) {
+    const response = errorObj.response as Record<string, unknown>;
+    if (typeof response.status === "number") {
+      return response.status >= 400 && response.status < 500;
+    }
   }
   
   // Check for error messages that typically indicate 4xx errors
