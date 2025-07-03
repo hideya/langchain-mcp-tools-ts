@@ -219,6 +219,7 @@ function processSchemaForLlmProvider(
         "Schema transformed for OpenAI: ", result.changesSummary);
     }
     processedSchema = result.schema;
+
     // Although the following issue was marked as completed, somehow
     // I am still experiencing the same difficulties as of July 2, 2025...
     //   https://github.com/langchain-ai/langchainjs/issues/6623

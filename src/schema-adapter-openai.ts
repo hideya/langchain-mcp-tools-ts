@@ -171,17 +171,17 @@ function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTrac
   }
 
   // Handle array items
-  if (Array.isArray(result.items)) {
-    if (result.items) {
-      if (Array.isArray(result.items)) {
-        result.items = result.items.map((item: JsonSchema, index: number) => {
-          tracker.nestedSchemasProcessed++;
-          return transformSchemaInternal(item, tracker, `${path}.items[${index}]`);
-        });
-      } else {
+  if (result.items) {
+    if (Array.isArray(result.items)) {
+      // Items is an array of schemas (tuple validation)
+      result.items = result.items.map((item: JsonSchema, index: number) => {
         tracker.nestedSchemasProcessed++;
-        result.items = transformSchemaInternal(result.items, tracker, `${path}.items`);
-      }
+        return transformSchemaInternal(item, tracker, `${path}.items[${index}]`);
+      });
+    } else {
+      // Items is a single schema (applies to all items)
+      tracker.nestedSchemasProcessed++;
+      result.items = transformSchemaInternal(result.items, tracker, `${path}.items`);
     }
   }
 
@@ -195,6 +195,22 @@ function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTrac
       tracker, 
       `${path}.additionalProperties`
     );
+  }
+
+  // Handle patternProperties (important for complex schemas)
+  if (result.patternProperties) {
+    const processedPatternProps: Record<string, JsonSchema> = {};
+    
+    for (const [pattern, patternSchema] of Object.entries(result.patternProperties)) {
+      tracker.nestedSchemasProcessed++;
+      processedPatternProps[pattern] = transformSchemaInternal(
+        patternSchema as JsonSchema, 
+        tracker, 
+        `${path}.patternProperties["${pattern}"]`
+      );
+    }
+    
+    result.patternProperties = processedPatternProps;
   }
 
   // Handle definitions (common in complex schemas)
@@ -213,6 +229,12 @@ function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTrac
       
       result[defsKey] = processedDefs;
     }
+  }
+
+  // Handle 'not' schemas
+  if (result.not) {
+    tracker.nestedSchemasProcessed++;
+    result.not = transformSchemaInternal(result.not, tracker, `${path}.not`);
   }
 
   return result;
