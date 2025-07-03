@@ -179,8 +179,8 @@ export async function test(): Promise<void> {
       mcpServers, {
         // logger: new SimpleConsoleLogger(),
         // llmProvider: "anthropic",
-        // llmProvider: "openai",
-        llmProvider: "google_gemini",
+        llmProvider: "openai",
+        // llmProvider: "google_gemini",
         // llmProvider: "google_genai",
       }
     );
@@ -194,20 +194,20 @@ export async function test(): Promise<void> {
     //   // model: "claude-sonnet-4-0"
     // });
 
-    // const llm = new ChatOpenAI({
-    //   // https://platform.openai.com/docs/pricing
-    //   // https://platform.openai.com/settings/organization/billing/overview
-    //   model: "gpt-4.1-nano"
-    //   // model: "o4-mini"
-    // });
-
-    const llm = new ChatGoogleGenerativeAI({
-      // https://ai.google.dev/gemini-api/docs/pricing
-      // https://console.cloud.google.com/billing
-      // model: "gemini-2.0-flash"
-      model: "gemini-2.5-flash"
-      // model: "gemini-2.5-pro"
+    const llm = new ChatOpenAI({
+      // https://platform.openai.com/docs/pricing
+      // https://platform.openai.com/settings/organization/billing/overview
+      model: "gpt-4.1-nano"
+      // model: "o4-mini"
     });
+
+    // const llm = new ChatGoogleGenerativeAI({
+    //   // https://ai.google.dev/gemini-api/docs/pricing
+    //   // https://console.cloud.google.com/billing
+    //   // model: "gemini-2.0-flash"
+    //   model: "gemini-2.5-flash"
+    //   // model: "gemini-2.5-pro"
+    // });
 
     const agent = createReactAgent({
       llm,

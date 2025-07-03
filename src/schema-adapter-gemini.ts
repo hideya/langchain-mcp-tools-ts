@@ -21,9 +21,7 @@
  *    see: https://ai.google.dev/gemini-api/docs/structured-output
  */
 
-interface JsonSchema {
-  [key: string]: any;
-}
+import { JsonSchema } from "@h1deya/json-schema-to-zod";
 
 interface GeminiCompatibleSchema {
   type?: string;
