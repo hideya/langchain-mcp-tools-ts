@@ -285,7 +285,10 @@ function transformSchemaInternal(
 
   // Copy other basic supported fields
   if (schema.description) result.description = schema.description;
-  if (schema.enum) result.enum = schema.enum;
+  // Copy enum only if it's a string array since Gemini can't handle others
+  if (schema.enum && Array.isArray(schema.enum) && schema.enum.every(item => typeof item === 'string')) {
+    result.enum = schema.enum as string[];
+  }
   if (schema.nullable !== undefined) result.nullable = schema.nullable;
   if (schema.example !== undefined) result.example = schema.example;
   if (schema.default !== undefined) result.default = schema.default;
@@ -317,8 +320,15 @@ function transformSchemaInternal(
   if (typeof schema.minItems === 'number') result.minItems = schema.minItems;
   if (typeof schema.maxItems === 'number') result.maxItems = schema.maxItems;
   if (schema.items) {
-    const itemsResult = transformSchemaInternal(schema.items, defsContext, tracker);
-    result.items = itemsResult;
+    if (Array.isArray(schema.items)) {
+      // Handle array case - maybe take first item or merge
+      if (schema.items.length > 0) {
+        result.items = transformSchemaInternal(schema.items[0], defsContext, tracker);
+      }
+    } else {
+      // Handle single schema case
+      result.items = transformSchemaInternal(schema.items, defsContext, tracker);
+    }
   }
 
   // Handle object properties
