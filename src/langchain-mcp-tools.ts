@@ -416,8 +416,6 @@ async function convertSingleMcpToLangchainTools(
       const urlConfig = config as UrlBasedConfig;
       
       // Try to connect with Streamable HTTP first, fallback to SSE on 4xx errors
-      let connectionSucceeded = false;
-      
       // Use the updated transport detection with MCP spec compliance
       transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
       logger.info(`MCP server "${serverName}": created transport, attempting connection`);

@@ -109,7 +109,9 @@ function validateAndFilterRequired(
     return undefined;
   }
   
-  const validRequired = required.filter(fieldName => properties.hasOwnProperty(fieldName));
+  const validRequired = required.filter(fieldName => 
+    Object.hasOwn(properties, fieldName)
+  );
   const filteredCount = required.length - validRequired.length;
   
   if (filteredCount > 0) {
@@ -127,7 +129,7 @@ function transformAnyOfVariants(
   defsContext: Record<string, JsonSchema>,
   tracker: TransformationTracker
 ): GeminiCompatibleSchema[] {
-  return anyOf.map((variant, index) => {
+  return anyOf.map((variant) => {
     const transformedVariant = transformSchemaInternal(variant, defsContext, tracker);
     
     // Special validation for anyOf variants
@@ -421,7 +423,7 @@ export function validateGeminiSchema(schema: any, path = ''): string[] {
 
     // Enhanced validation: Check required vs properties consistency
     if (key === 'required' && Array.isArray(value) && schema.properties) {
-      const invalidRequired = value.filter(reqField => !schema.properties.hasOwnProperty(reqField));
+      const invalidRequired = value.filter(reqField => !Object.hasOwn(schema.properties, reqField));
       if (invalidRequired.length > 0) {
         errors.push(`Required field(s) [${invalidRequired.join(', ')}] not found in properties at ${currentPath}`);
       }

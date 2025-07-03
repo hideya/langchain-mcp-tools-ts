@@ -109,7 +109,7 @@ function transformSchemaInternal(schema: any, tracker: TransformationTracker, pa
   // Handle array items
   if (result.items) {
     if (Array.isArray(result.items)) {
-      result.items = result.items.map((item, index) => {
+      result.items = result.items.map((item: any, index: number) => {
         tracker.nestedSchemasProcessed++;
         return transformSchemaInternal(item, tracker, `${path}.items[${index}]`);
       });

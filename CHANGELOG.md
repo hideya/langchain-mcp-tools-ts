@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Introduce a new option to specify the target LLM provider and ensure full compatibility with the target model
 - Update REAMDE.md accordingly
 - Separate out the transport-related supporting functions into src/transport-utils.ts
+- Separate out the tool conversion logic into a utility fuction
 
 ### Added
 - Option to specify provider-specific JSON schema transformations

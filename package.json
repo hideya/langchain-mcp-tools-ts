@@ -41,6 +41,7 @@
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env",
     "_comment_test": "# Testing scripts",
     "test": "vitest run",
