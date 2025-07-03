@@ -23,7 +23,7 @@
 
 
 // Most MCP servers use Draft 7 or compatible
-interface JsonSchemaDraft7 {
+export interface JsonSchemaDraft7 {
   // JSON Schema core
   $schema?: string;
   $id?: string;
@@ -77,6 +77,8 @@ interface JsonSchemaDraft7 {
   // Allow additional properties for flexibility
   [key: string]: unknown;
 }
+
+type JsonSchema = JsonSchemaDraft7;
 interface GeminiCompatibleSchema {
   type?: string;
   format?: string;
@@ -117,8 +119,8 @@ interface TransformationTracker {
 }
 
 export function makeJsonSchemaGeminiCompatible(
-  schema: JsonSchemaDraft7,
-  defsContext: Record<string, JsonSchemaDraft7> = {}
+  schema: JsonSchema,
+  defsContext: Record<string, JsonSchema> = {}
 ): TransformResult {
   const tracker: TransformationTracker = {
     fieldsRemoved: [],
@@ -177,8 +179,8 @@ function validateAndFilterRequired(
  * Ensures each anyOf variant is independently valid according to Gemini rules
  */
 function transformAnyOfVariants(
-  anyOf: JsonSchemaDraft7[],
-  defsContext: Record<string, JsonSchemaDraft7>,
+  anyOf: JsonSchema[],
+  defsContext: Record<string, JsonSchema>,
   tracker: TransformationTracker
 ): GeminiCompatibleSchema[] {
   return anyOf.map((variant) => {
@@ -203,8 +205,8 @@ function transformAnyOfVariants(
 }
 
 function transformSchemaInternal(
-  schema: JsonSchemaDraft7,
-  defsContext: Record<string, JsonSchemaDraft7>,
+  schema: JsonSchema,
+  defsContext: Record<string, JsonSchema>,
   tracker: TransformationTracker
 ): GeminiCompatibleSchema {
   // Handle $ref by resolving definitions
@@ -335,7 +337,7 @@ function transformSchemaInternal(
   if (schema.properties) {
     result.properties = {};
     for (const [key, propSchema] of Object.entries(schema.properties)) {
-      result.properties[key] = transformSchemaInternal(propSchema as JsonSchemaDraft7, defsContext, tracker);
+      result.properties[key] = transformSchemaInternal(propSchema as JsonSchema, defsContext, tracker);
     }
   }
 
@@ -350,7 +352,7 @@ function transformSchemaInternal(
   } else if (schema.allOf) {
     tracker.fieldsConverted.push('allOf → object merge');
     // Convert allOf to object merge (best effort)
-    const merged: JsonSchemaDraft7 = { type: 'object' };
+    const merged: JsonSchema = { type: 'object' };
     for (const subSchema of schema.allOf) {
       Object.assign(merged, subSchema);
       if (subSchema.properties) {
@@ -442,7 +444,7 @@ function generateChangesSummary(tracker: TransformationTracker): string {
 /**
  * Specifically transforms MCP tool schemas for Gemini function declarations
  */
-export function transformMcpToolForGemini(mcpTool: { name: string; description?: string; inputSchema?: JsonSchemaDraft7 }) {
+export function transformMcpToolForGemini(mcpTool: { name: string; description?: string; inputSchema?: JsonSchema }) {
   const transformResult = makeJsonSchemaGeminiCompatible(mcpTool.inputSchema || {});
   
   const functionDeclaration = {
@@ -485,7 +487,7 @@ export function validateGeminiSchema(schema: GeminiCompatibleSchema, path = ''):
 
     // Enhanced validation: Check required vs properties consistency
     if (key === 'required' && Array.isArray(value) && schema.properties) {
-      const invalidRequired = value.filter(reqField => !Object.hasOwn(schema.properties, reqField));
+      const invalidRequired = value.filter(reqField => !Object.hasOwn(schema.properties!, reqField));
       if (invalidRequired.length > 0) {
         errors.push(`Required field(s) [${invalidRequired.join(', ')}] not found in properties at ${currentPath}`);
       }

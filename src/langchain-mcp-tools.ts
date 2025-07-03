@@ -10,7 +10,7 @@ import { CallToolResultSchema, ListToolsResultSchema, Tool } from "@modelcontext
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 
-import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
+import { makeJsonSchemaGeminiCompatible, JsonSchemaDraft7 } from "./schema-adapter-gemini.js";
 import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
 import { Logger } from "./logger.js";
 import { createHttpTransportWithFallback } from "./transport-utils.js";
@@ -213,7 +213,7 @@ function processSchemaForLlmProvider(
   if (llmProvider === "openai") {
     // OpenAI requires optional fields to be nullable (.optional() + .nullable())
     // Transform schema to meet OpenAI's requirements
-    const result = makeJsonSchemaOpenAICompatible(processedSchema);
+    const result = makeJsonSchemaOpenAICompatible(processedSchema as JsonSchemaDraft7);
     if (result.wasTransformed) {
       logger.info(`MCP server "${serverName}/${toolName}"`,
         "Schema transformed for OpenAI: ", result.changesSummary);
@@ -228,7 +228,7 @@ function processSchemaForLlmProvider(
   } else if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
     // Google Gemini API rejects nullable fields and requires strict OpenAPI 3.0 subset compliance
     // Transform schema to meet Gemini's strict requirements
-    const result = makeJsonSchemaGeminiCompatible(processedSchema);
+    const result = makeJsonSchemaGeminiCompatible(processedSchema as JsonSchemaDraft7);
     if (result.wasTransformed) {
       logger.info(`MCP server "${serverName}/${toolName}"`,
         "Schema transformed for Gemini: ", result.changesSummary);
