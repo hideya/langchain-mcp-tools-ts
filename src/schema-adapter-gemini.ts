@@ -94,9 +94,9 @@ interface GeminiCompatibleSchema {
   minLength?: number;
   maxLength?: number;
   pattern?: string;
-  example?: any;
+  example?: unknown;
   anyOf?: GeminiCompatibleSchema[];
-  default?: any;
+  default?: unknown;
 }
 
 interface TransformResult {
@@ -146,7 +146,7 @@ export function makeJsonSchemaGeminiCompatible(
  */
 function validateAndFilterRequired(
   required: string[] | undefined,
-  properties: Record<string, any> | undefined,
+  properties: Record<string, GeminiCompatibleSchema> | undefined,
   tracker: TransformationTracker
 ): string[] | undefined {
   if (!required || !Array.isArray(required)) {
@@ -442,7 +442,7 @@ function generateChangesSummary(tracker: TransformationTracker): string {
 /**
  * Specifically transforms MCP tool schemas for Gemini function declarations
  */
-export function transformMcpToolForGemini(mcpTool: any) {
+export function transformMcpToolForGemini(mcpTool: { name: string; description?: string; inputSchema?: JsonSchemaDraft7 }) {
   const transformResult = makeJsonSchemaGeminiCompatible(mcpTool.inputSchema || {});
   
   const functionDeclaration = {
@@ -467,7 +467,7 @@ export function transformMcpToolForGemini(mcpTool: any) {
  * Enhanced utility to validate that a schema only uses Gemini-supported fields
  * and follows all Gemini validation rules
  */
-export function validateGeminiSchema(schema: any, path = ''): string[] {
+export function validateGeminiSchema(schema: GeminiCompatibleSchema, path = ''): string[] {
   const errors: string[] = [];
   const supportedFields = new Set([
     'type', 'format', 'description', 'nullable', 'enum', 'maxItems', 
@@ -498,7 +498,7 @@ export function validateGeminiSchema(schema: any, path = ''): string[] {
 
     // Recursively validate nested schemas
     if (key === 'properties' && typeof value === 'object') {
-      for (const [propKey, propValue] of Object.entries(value as any)) {
+      for (const [propKey, propValue] of Object.entries(value as Record<string, GeminiCompatibleSchema>)) {
         errors.push(...validateGeminiSchema(propValue, `${currentPath}.${propKey}`));
       }
     } else if (key === 'items' && typeof value === 'object') {
