@@ -60,7 +60,7 @@ function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTrac
   // Handle object properties
   if (result.properties) {
     const processedProperties: Record<string, JsonSchema> = {};
-    const required = new Set(result.required || []);
+    const required = new Set(Array.isArray(result.required) ? result.required : []);
 
     for (const [key, propSchema] of Object.entries(result.properties)) {
       const propPath = path ? `${path}.${key}` : key;
@@ -71,10 +71,10 @@ function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTrac
         if (processedProp.type && !processedProp.nullable) {
           processedProp.nullable = true;
           tracker.nullableFieldsAdded.push(propPath);
-        } else if (processedProp.anyOf && !processedProp.anyOf.some((s: JsonSchema) => s.type === "null")) {
+        } else if (Array.isArray(processedProp.anyOf) && !processedProp.anyOf.some((s: JsonSchema) => s.type === "null")) {
           processedProp.anyOf = [...processedProp.anyOf, { type: "null" }];
           tracker.anyOfNullsAdded.push(propPath);
-        } else if (processedProp.oneOf && !processedProp.oneOf.some((s: JsonSchema) => s.type === "null")) {
+        } else if (Array.isArray(processedProp.oneOf) && !processedProp.oneOf.some((s: JsonSchema) => s.type === "null")) {
           processedProp.oneOf = [...processedProp.oneOf, { type: "null" }];
           tracker.oneOfNullsAdded.push(propPath);
         }
@@ -87,25 +87,31 @@ function transformSchemaInternal(schema: JsonSchema, tracker: TransformationTrac
   }
 
   // Handle anyOf/oneOf/allOf recursively
-  if (result.anyOf) {
-    result.anyOf = result.anyOf.map((subSchema: JsonSchema, index: number) => {
-      tracker.nestedSchemasProcessed++;
-      return transformSchemaInternal(subSchema, tracker, `${path}.anyOf[${index}]`);
-    });
+  if (Array.isArray(result.anyOf)) {
+    if (result.anyOf) {
+      result.anyOf = result.anyOf.map((subSchema: JsonSchema, index: number) => {
+        tracker.nestedSchemasProcessed++;
+        return transformSchemaInternal(subSchema, tracker, `${path}.anyOf[${index}]`);
+      });
+    }
   }
   
-  if (result.oneOf) {
-    result.oneOf = result.oneOf.map((subSchema: JsonSchema, index: number) => {
-      tracker.nestedSchemasProcessed++;
-      return transformSchemaInternal(subSchema, tracker, `${path}.oneOf[${index}]`);
-    });
+  if (Array.isArray(result.oneOf)) {
+    if (result.oneOf) {
+      result.oneOf = result.oneOf.map((subSchema: JsonSchema, index: number) => {
+        tracker.nestedSchemasProcessed++;
+        return transformSchemaInternal(subSchema, tracker, `${path}.oneOf[${index}]`);
+      });
+    }
   }
   
-  if (result.allOf) {
-    result.allOf = result.allOf.map((subSchema: JsonSchema, index: number) => {
-      tracker.nestedSchemasProcessed++;
-      return transformSchemaInternal(subSchema, tracker, `${path}.allOf[${index}]`);
-    });
+  if (Array.isArray(result.allOf)) {
+    if (result.allOf) {
+      result.allOf = result.allOf.map((subSchema: JsonSchema, index: number) => {
+        tracker.nestedSchemasProcessed++;
+        return transformSchemaInternal(subSchema, tracker, `${path}.allOf[${index}]`);
+      });
+    }
   }
 
   // Handle array items
