@@ -10,7 +10,8 @@ import { CallToolResultSchema, ListToolsResultSchema, Tool } from "@modelcontext
 import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { jsonSchemaToZod, JsonSchema } from "@h1deya/json-schema-to-zod";
 
-import { makeJsonSchemaGeminiCompatible, JsonSchemaDraft7 } from "./schema-adapter-gemini.js";
+import { JsonSchemaDraft7 } from "./schema-adapter-types.js";
+import { makeJsonSchemaGeminiCompatible } from "./schema-adapter-gemini.js";
 import { makeJsonSchemaOpenAICompatible } from "./schema-adapter-openai.js";
 import { Logger } from "./logger.js";
 import { createHttpTransportWithFallback } from "./transport-utils.js";
