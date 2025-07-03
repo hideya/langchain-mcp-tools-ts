@@ -9,7 +9,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ### Changed
-- Minor README.md refinements
+- Remove the automatic JSON schema transformation feature, as it was imperfect and can be confusing
+  This may result in execution failures -- in that case, use the newly introduced llmProvider option
+- Introduce a new option to specify the target LLM provider and ensure compatibility with the target model
+- Update REAMDE.md accordingly
+- Separate out the transport-related supporting functions into src/transport-utils.ts
+- Separate out the tool conversion logic into a utility fuction
+
+### Added
+- Option to specify provider-specific JSON schema transformations
+
+### Fixed
+- Issue #46: LLM Provider Schema Compatibility Issue
 
 
 ## [0.2.9] - 2025-06-24
@@ -17,7 +28,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Replace @n8n/json-schema-to-zod with the version that includes the ESM fix
 - Update Node.js prerequisites from 16+ to 18+
-- Updated dependencies
+- Update dependencies
 
 ## Fixed
 - Ensure `makeZodSchemaOpenAICompatible()` works even when schema.shape is undefined

@@ -1,11 +1,5 @@
 import * as child_process from 'child_process';
 import * as net from 'net';
-import WebSocket from 'ws';
-
-// NOTE: without the following, I got this error:
-//   ReferenceError: WebSocket is not defined
-//     at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
-global.WebSocket = WebSocket as any;
 
 // NOTE: Hard-coded dependency on the Supergateway message
 // to easily identify the end of initialization.

@@ -4,8 +4,9 @@ A simple, lightweight library intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools with LangChain.
 
-Its simplicity and extra features for stdio MCP servers can make it useful as a basis for your own customizations.
-However, it only supports text results of tool calls and does not support MCP features other than tools.
+Its simplicity and extra features, such as tool schema adjustments and stdio MCP server logging,
+make it a useful basis for your experiments and customizations.
+However, it only supports text results of tool calls and does not support MCP features other than Tools.
 
 [LangChain's **official LangChain.js MCP Adapters** library](https://www.npmjs.com/package/@langchain/mcp-adapters),
 which supports comprehensive integration with LangChain, has been released.
@@ -83,7 +84,14 @@ const mcpServers: McpServersConfig = {
   },
 };
 
-const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers, {
+    // Perform provider-specific JSON schema transformations to prevent schema compatibility issues
+    llmProvider: "google_gemini"
+    // llmProvider: "openai"
+    // llmProvider: "anthropic"
+  }
+);
 ```
 
 This utility function initializes all specified MCP servers in parallel,
@@ -91,6 +99,12 @@ and returns LangChain Tools
 ([`tools: StructuredTool[]`](https://api.js.langchain.com/classes/_langchain_core.tools.StructuredTool.html))
 by gathering available MCP tools from the servers,
 and by wrapping them into LangChain tools.
+
+When `llmProvider` option is specified, it performs LLM provider-specific schema transformations
+for MCP tools to prevent schema compatibility issues.
+Set this option when you enconter schema related warnings/errors while execution.  
+[See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
+
 It also returns an async callback function (`cleanup: McpServerCleanupFn`)
 to be invoked to close all MCP server sessions when finished.
 
@@ -98,7 +112,7 @@ The returned tools can be used with LangChain, e.g.:
 
 ```ts
 // import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-const llm = new ChatGoogleGenerativeAI({ model: "gemini-2.0-flash" })
+const llm = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash" });
 
 // import { createReactAgent } from "@langchain/langgraph/prebuilt";
 const agent = createReactAgent({
@@ -106,6 +120,9 @@ const agent = createReactAgent({
   tools
 });
 ```
+
+A minimal but complete working usage example can be found
+[in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
 
 For hands-on experimentation with MCP server integration,
 try [this MCP Client CLI tool built with this library](https://www.npmjs.com/package/@h1deya/mcp-try-cli)
@@ -128,8 +145,8 @@ While MCP tools can return multiple content types (text, images, etc.), this lib
 
 ### Notes:
 
-- **LLM Compatibility and Schema Transformations**: The library automatically performs schema transformations for LLM compatibility.
-  [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-compatibility) for details.
+- **LLM Compatibility and Schema Transformations**: The library can perform schema transformations for LLM compatibility.
+  [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
 - **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to stdio server configrations if not explicitly provided to ensure servers can find required executables.
 
 
@@ -290,76 +307,90 @@ Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/C
 
 ### Troubleshooting
 
-#### Common Configuration Errors
-
-**McpInitializationError: Cannot specify both 'command' and 'url'**
-- Remove either the `command` field (for URL-based servers) or the `url` field (for local stdio servers)
-- Use `command` for local MCP servers, `url` for remote servers
-
-**McpInitializationError: URL protocol to be http: or https:**
-- Check that your URL starts with `http://` or `https://` when using HTTP transport
-- For WebSocket servers, use `ws://` or `wss://` URLs
-
-**McpInitializationError: command to be specified**
-- Add a `command` field when using stdio transport
-- Ensure the command path is correct and the executable exists
-
-#### Transport Detection Issues
-
-**Transport detection failed**
-- Server may not support the MCP protocol correctly
-- Try specifying an explicit transport type (`transport: "streamable_http"` or `transport: "sse"`)
-- Check server documentation for supported transport types
-
-**Connection timeout or network errors**
-- Verify the server URL and port are correct
-- Check that the server is running and accessible
-- Ensure firewall/network settings allow the connection
-
-#### Tool Execution Problems
-
-**Schema sanitization warnings for Gemini compatibility**
-- These are informational and generally safe to ignore
-- Consider updating the MCP server to use Gemini-compatible schemas
-- Warnings help identify servers that may need upstream fixes
-
-**Tool calls returning empty results**
-- Check server logs (use `stderr` redirection to capture them)
-- Verify tool parameters match the expected schema
-- Enable debug logging to see detailed tool execution information
-
-#### Debug Steps
-
 1. **Enable debug logging**: Set `logLevel: "debug"` to see detailed connection and execution logs
 2. **Check server stderr**: For stdio MCP servers, use `stderr` redirection to capture server error output
 3. **Test explicit transports**: Try forcing specific transport types to isolate auto-detection issues
 4. **Verify server independently**: Test the MCP server with other clients (e.g., MCP Inspector)
 
-#### Configuration Validation
+### LLM Provider Schema Compatibility
 
-The library validates server configurations and will throw `McpInitializationError` for invalid configurations:
+Different LLM providers have incompatible JSON Schema requirements for function calling:
 
-- **Cannot specify both `url` and `command`**: Use `command` for local servers or `url` for remote servers
-- **Transport type must match URL protocol**: e.g., `transport: "http"` requires `http:` or `https:` URL
-- **Transport requires appropriate configuration**: HTTP/WS transports need URLs, stdio transport needs command
+- **OpenAI requires**: Optional fields must be nullable (`.optional()` + `.nullable()`)
+  for function calling (based on Structured Outputs API requirements,
+  strict enforcement coming in future SDK versions)"
+- **Google Gemini API**: Rejects nullable fields and `$defs` references, requires strict OpenAPI 3.0 subset compliance
+- **Anthropic Claude**: Very relaxed schema requirements with no documented restrictions
 
-### LLM Compatibility
+**Note**: Google Vertex AI provides OpenAI-compatible endpoints that support nullable fields.
 
-The library automatically handles schema compatibility for different LLM providers:
+#### Real-World Impact
 
-- **Google Gemini**: Sanitizes schemas to remove unsupported properties (logs warnings when changes are made)
-- **OpenAI Structured Outputs**: Makes optional fields nullable as required by OpenAI's specification
-- **Anthropic Claude**: Works with schemas as-is
-- **Other providers**: Generally compatible with standard JSON schemas
+This creates challenges for developers trying to create universal schemas across providers.
 
-Schema transformations are applied automatically and logged at the `warn` level when changes are made, helping you identify which MCP servers might need upstream schema fixes for optimal compatibility.
+Many MCP servers generate schemas that don't satisfy all providers' requirements.  
+For example, the official Notion MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (as of Jul 2, 2025) produces:
+
+**OpenAI Warnings:**
+```
+Zod field at `#/definitions/API-get-users/properties/start_cursor` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
+... followed by many more
+```
+
+**Gemini Errors:**
+```
+GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] * GenerateContentRequest.tools[0].function_declarations[0].parameters.properties[children].items.properties[paragraph].properties[rich_text].items.properties[mention].any_of[0].required: only allowed for OBJECT type
+... followed by many more
+```
+
+#### Solution
+
+The new option, `llmProvider`, has been introduced for performing provider-specific JSON schema transformations:
+
+```typescript
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers, {
+    llmProvider: "openai"        // Makes optional fields nullable
+    // llmProvider: "google_gemini" // Applies Gemini's strict validation rules  
+    // llmProvider: "anthropic"     // No transformations needed
+  }
+);
+```
+
+**Features:**
+- Generates INFO-level logs when transformations are applied
+- Helps users identify potential MCP server schema improvements
+- Falls back to original schema when no `llmProvider` is specified
+
+#### Provider-Specific Transformations
+
+| Provider | Transformations Applied |
+|----------|------------------------|
+| `openai` | Makes optional fields nullable, handles union types |
+| `google_gemini` | Filters invalid required fields, fixes anyOf variants, removes unsupported features |
+| `anthropic` | Accepts schemas as-is, but handles them efficiently |
+
+For other providers, try without specifying the option:
+
+```typescript
+const { tools, cleanup } = await convertMcpToLangchainTools(
+  mcpServers
+);
+```
+
+#### References
+
+- [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
+- [Gemini API Schema Requirements](https://ai.google.dev/api/caching#Schema)
+- [Anthropic Tool Use](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview)
+
 
 ### Resource Management
 
 The returned `cleanup` function properly handles resource cleanup:
 
 - Closes all MCP server connections concurrently
-- Logs any cleanup failures without throwing errors
+- Logs any cleanup failures
 - Continues cleanup of remaining servers even if some fail
 - Should always be called when done using the tools
 
@@ -403,4 +434,5 @@ Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
 
 ### For Developers
 
-See [README_DEV.md](README_DEV.md) for more information about development and testing.
+See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md)
+for more information about development and testing.
