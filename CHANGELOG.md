@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Issue #46: LLM Provider Schema Compatibility Issue
 
 ### Changed
-- Remove automatic JSON schema transformations
+- Remove the automatic JSON schema transformation feature, as it was imperfect and can be confusing
 - Introduce a new option to specify the target LLM provider and ensure full compatibility with the target model
 - Update REAMDE.md accordingly
 - Separate out the transport-related supporting functions into src/transport-utils.ts
