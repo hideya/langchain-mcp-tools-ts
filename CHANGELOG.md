@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
-## [Unreleased]
+## [0.3.0] - 2025-07-03
 
 ### Changed
 - Remove the automatic JSON schema transformation feature, as it was imperfect and can be confusing

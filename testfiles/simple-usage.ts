@@ -11,9 +11,10 @@ import {
   convertMcpToLangchainTools,
   McpServersConfig,
   McpServerCleanupFn,
-  McpToolsLogger
+  McpToolsLogger,
+  LlmProvider
 } from "../src/langchain-mcp-tools";
-import { LogLevel } from "../src/logger";
+
 import { startRemoteMcpServerLocally } from "./remote-server-utils";
 
 export async function test(): Promise<void> {
@@ -87,12 +88,12 @@ export async function test(): Promise<void> {
       //   // optionally `transport: "ws"` or `type: "ws"`
       // },
 
-      // // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
-      // "brave-search": {
-      //     "command": "npx",
-      //     "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
-      //     "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
-      // },
+      // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
+      "brave-search": {
+          "command": "npx",
+          "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
+          "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+      },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -173,19 +174,7 @@ export async function test(): Promise<void> {
       public error(...args: unknown[]) { this.log("ERROR", ...args); }
     }
 
-    // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
-    // const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, { logLevel: "debug" });
-    const { tools, cleanup } = await convertMcpToLangchainTools(
-      mcpServers, {
-        // logger: new SimpleConsoleLogger(),
-        // llmProvider: "anthropic",
-        // llmProvider: "openai",
-        llmProvider: "google_gemini",
-        // llmProvider: "google_genai",
-      }
-    );
-
-    mcpCleanup = cleanup
+    // Uncomment one of the following and select the LLM to use
 
     // const llm = new ChatAnthropic({
     //   // https://docs.anthropic.com/en/docs/about-claude/pricing
@@ -204,10 +193,27 @@ export async function test(): Promise<void> {
     const llm = new ChatGoogleGenerativeAI({
       // https://ai.google.dev/gemini-api/docs/pricing
       // https://console.cloud.google.com/billing
-      // model: "gemini-2.0-flash"
-      model: "gemini-2.5-flash"
+      model: "gemini-2.0-flash"
+      // model: "gemini-2.5-flash"
       // model: "gemini-2.5-pro"
     });
+
+    let llmProvider: LlmProvider = "none";
+    if (llm instanceof ChatAnthropic) {
+      llmProvider = "anthropic";
+    } else if (llm as object instanceof ChatOpenAI) {
+      llmProvider = "openai";
+    } else if (llm as object instanceof ChatGoogleGenerativeAI) {
+      llmProvider = "google_genai";
+    } 
+
+    const { tools, cleanup } = await convertMcpToLangchainTools(
+      mcpServers, { llmProvider }
+      // mcpServers, { llmProvider, logLevel: "debug" }  // Usage example of logLevel
+      // mcpServers, { llmProvider, logger: new SimpleConsoleLogger() }  // Usage example of a custom logger
+    );
+
+    mcpCleanup = cleanup
 
     const agent = createReactAgent({
       llm,
@@ -226,11 +232,11 @@ export async function test(): Promise<void> {
     // const query = "Tell me how many github repositories I have?"
     // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
     // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +
-    //   "increment the coutns by 1, and show all the items in the DB."
+    //   "increment the coutns by 1, and show all the items in the DB.";
     // const query = "Use sequential thinking to arrange these events of backing bread " +
-    //   "in the correct sequence: baking, proofing, mixing, kneading, cooling"
-    const query = "Tell me about my Notion account"
-    // const query = "Today's news in Tokyo?"
+    //   "in the correct sequence: baking, proofing, mixing, kneading, cooling";
+    // const query = "Tell me about my Notion account";
+    const query = "What's the news from Tokyo today?";
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
