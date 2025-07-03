@@ -21,8 +21,62 @@
  *    see: https://ai.google.dev/gemini-api/docs/structured-output
  */
 
-import { JsonSchema } from "@h1deya/json-schema-to-zod";
 
+// Most MCP servers use Draft 7 or compatible
+interface JsonSchemaDraft7 {
+  // JSON Schema core
+  $schema?: string;
+  $id?: string;
+  $ref?: string;
+  $defs?: Record<string, JsonSchemaDraft7>;
+  definitions?: Record<string, JsonSchemaDraft7>;
+  
+  // Type definitions
+  type?: string | string[];
+  format?: string;
+  
+  // Object properties
+  properties?: Record<string, JsonSchemaDraft7>;
+  required?: string[];
+  additionalProperties?: boolean | JsonSchemaDraft7;
+  patternProperties?: Record<string, JsonSchemaDraft7>;
+  
+  // Array properties  
+  items?: JsonSchemaDraft7 | JsonSchemaDraft7[];
+  minItems?: number;
+  maxItems?: number;
+  
+  // String properties
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  
+  // Number properties
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number | boolean;
+  exclusiveMaximum?: number | boolean;
+  
+  // Composition
+  anyOf?: JsonSchemaDraft7[];
+  oneOf?: JsonSchemaDraft7[];
+  allOf?: JsonSchemaDraft7[];
+  not?: JsonSchemaDraft7;
+  
+  // Validation
+  enum?: unknown[];
+  const?: unknown;
+  
+  // Metadata
+  title?: string;
+  description?: string;
+  default?: unknown;
+  examples?: unknown[];
+  nullable?: boolean;
+  
+  // Allow additional properties for flexibility
+  [key: string]: unknown;
+}
 interface GeminiCompatibleSchema {
   type?: string;
   format?: string;
@@ -63,8 +117,8 @@ interface TransformationTracker {
 }
 
 export function makeJsonSchemaGeminiCompatible(
-  schema: JsonSchema,
-  defsContext: Record<string, JsonSchema> = {}
+  schema: JsonSchemaDraft7,
+  defsContext: Record<string, JsonSchemaDraft7> = {}
 ): TransformResult {
   const tracker: TransformationTracker = {
     fieldsRemoved: [],
@@ -123,8 +177,8 @@ function validateAndFilterRequired(
  * Ensures each anyOf variant is independently valid according to Gemini rules
  */
 function transformAnyOfVariants(
-  anyOf: JsonSchema[],
-  defsContext: Record<string, JsonSchema>,
+  anyOf: JsonSchemaDraft7[],
+  defsContext: Record<string, JsonSchemaDraft7>,
   tracker: TransformationTracker
 ): GeminiCompatibleSchema[] {
   return anyOf.map((variant) => {
@@ -149,8 +203,8 @@ function transformAnyOfVariants(
 }
 
 function transformSchemaInternal(
-  schema: JsonSchema,
-  defsContext: Record<string, JsonSchema>,
+  schema: JsonSchemaDraft7,
+  defsContext: Record<string, JsonSchemaDraft7>,
   tracker: TransformationTracker
 ): GeminiCompatibleSchema {
   // Handle $ref by resolving definitions
@@ -271,7 +325,7 @@ function transformSchemaInternal(
   if (schema.properties) {
     result.properties = {};
     for (const [key, propSchema] of Object.entries(schema.properties)) {
-      result.properties[key] = transformSchemaInternal(propSchema as JsonSchema, defsContext, tracker);
+      result.properties[key] = transformSchemaInternal(propSchema as JsonSchemaDraft7, defsContext, tracker);
     }
   }
 
@@ -286,7 +340,7 @@ function transformSchemaInternal(
   } else if (schema.allOf) {
     tracker.fieldsConverted.push('allOf → object merge');
     // Convert allOf to object merge (best effort)
-    const merged: JsonSchema = { type: 'object' };
+    const merged: JsonSchemaDraft7 = { type: 'object' };
     for (const subSchema of schema.allOf) {
       Object.assign(merged, subSchema);
       if (subSchema.properties) {
