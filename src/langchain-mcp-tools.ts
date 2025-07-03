@@ -189,6 +189,152 @@ export class McpInitializationError extends Error implements McpError {
 }
 
 /**
+ * Applies LLM provider-specific schema transformations to ensure compatibility.
+ * Different LLM providers have incompatible JSON Schema requirements for function calling.
+ *
+ * @param schema - Original tool input schema from MCP server
+ * @param llmProvider - Target LLM provider for compatibility transformations
+ * @param serverName - Server name for logging context
+ * @param toolName - Tool name for logging context
+ * @param logger - Logger instance for recording transformations
+ * @returns Transformed schema compatible with the specified LLM provider
+ *
+ * @internal
+ */
+function processSchemaForLlmProvider(
+  schema: ToolSchemaBase,
+  llmProvider: LlmProvider,
+  serverName: string,
+  toolName: string,
+  logger: McpToolsLogger
+): ToolSchemaBase {
+  let processedSchema: ToolSchemaBase = schema;
+
+  if (llmProvider === "openai") {
+    // OpenAI requires optional fields to be nullable (.optional() + .nullable())
+    // Transform schema to meet OpenAI's requirements
+    const result = makeJsonSchemaOpenAICompatible(processedSchema);
+    if (result.wasTransformed) {
+      logger.info(`MCP server "${serverName}/${toolName}"`,
+        "Schema transformed for OpenAI: ", result.changesSummary);
+    }
+    processedSchema = result.schema;
+    // Although the following issue was marked as completed, somehow
+    // I am still experiencing the same difficulties as of July 2, 2025...
+    //   https://github.com/langchain-ai/langchainjs/issues/6623
+    // The following is a workaround to avoid the error
+    processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
+
+  } else if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
+    // Google Gemini API rejects nullable fields and requires strict OpenAPI 3.0 subset compliance
+    // Transform schema to meet Gemini's strict requirements
+    const result = makeJsonSchemaGeminiCompatible(processedSchema);
+    if (result.wasTransformed) {
+      logger.info(`MCP server "${serverName}/${toolName}"`,
+        "Schema transformed for Gemini: ", result.changesSummary);
+    }
+    processedSchema = result.schema;
+
+  } else if (llmProvider === "anthropic") {
+    // Anthropic Claude has very relaxed schema requirements with no documented restrictions
+    // No schema modifications needed
+    // Claude is tested to work fine with passing the JSON schema directly
+
+  } else {
+    // Take a conservative approach and use the Zod-converted schema
+    // It's an old way, but well exercised
+    processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
+  }
+
+  return processedSchema;
+}
+
+/**
+ * Creates a LangChain DynamicStructuredTool from an MCP tool definition.
+ * Handles schema processing, tool execution, and error handling.
+ *
+ * @param tool - MCP tool definition
+ * @param serverName - Server name for logging and identification
+ * @param client - MCP client for tool execution
+ * @param llmProvider - LLM provider for schema compatibility
+ * @param logger - Logger instance
+ * @returns Configured DynamicStructuredTool ready for LangChain use
+ *
+ * @internal
+ */
+function createLangChainTool(
+  tool: any,  // MCP tool type
+  serverName: string,
+  client: Client,
+  llmProvider: LlmProvider,
+  logger: McpToolsLogger
+): DynamicStructuredTool {
+
+  const processedSchema = processSchemaForLlmProvider(
+    tool.inputSchema,
+    llmProvider,
+    serverName,
+    tool.name,
+    logger
+  );
+
+  return new DynamicStructuredTool({
+    name: tool.name,
+    description: tool.description || "",
+    schema: processedSchema,
+
+    func: async function(input) {
+      logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
+
+      try {
+        // Execute tool call
+        const result = await client?.request(
+          {
+            method: "tools/call",
+            params: {
+              name: tool.name,
+              arguments: input,
+            },
+          },
+          CallToolResultSchema
+        );
+
+        // Handles null/undefined cases gracefully
+        if (!result?.content) {
+          logger.info(`MCP tool "${serverName}"/"${tool.name}" received null/undefined result`);
+          return "";
+        }
+
+        // Extract text content from tool results
+        // MCP tools can return multiple content types, but this library currently uses
+        // LangChain's 'content' response format which only supports text strings
+        const textContent = result.content
+          .filter(content => content.type === "text")
+          .map(content => content.text)
+          .join("\n\n");
+
+        // Alternative approach using JSON serialization (preserved for reference):
+        // const textItems = result.content
+        //   .filter(content => content.type === "text")
+        //   .map(content => content.text)
+        // const textContent = JSON.stringify(textItems);
+
+        // Log rough result size for monitoring
+        const size = new TextEncoder().encode(textContent).length
+        logger.info(`MCP tool "${serverName}"/"${tool.name}" received result (size: ${size})`);
+
+        // If no text content, return a clear message describing the situation
+        return textContent || "No text content available in response";
+
+      } catch (error: unknown) {
+          logger.warn(`MCP tool "${serverName}"/"${tool.name}" caused error: ${error}`);
+          return `Error executing MCP tool: ${error}`;
+      }
+    },
+  });
+}
+
+/**
  * Initializes a single MCP server and converts its capabilities into LangChain tools.
  * Sets up a connection to the server, retrieves available tools, and creates corresponding
  * LangChain tool instances with optional schema transformations for LLM compatibility.
@@ -338,103 +484,9 @@ async function convertSingleMcpToLangchainTools(
       ListToolsResultSchema
     );
 
-    const tools = toolsResponse.tools.map((tool) => {
-
-      // Apply LLM provider-specific schema transformations to ensure compatibility
-      // Different LLM providers have incompatible JSON Schema requirements for function calling
-      let processedSchema: ToolSchemaBase = tool.inputSchema;
-      
-      if (llmProvider === "openai") {
-        // OpenAI requires optional fields to be nullable (.optional() + .nullable())
-        // Transform schema to meet OpenAI's requirements
-        const result = makeJsonSchemaOpenAICompatible(processedSchema);
-        if (result.wasTransformed) {
-          logger.info(`MCP server "${serverName}/${tool.name}"`, 
-            "Schema transformed for OpenAI: ", result.changesSummary);
-        }
-        processedSchema = result.schema;
-        // Although the following issue was marked as completed, somehow
-        // I am still experiencing the same difficulties as of July 2, 2025...
-        //   https://github.com/langchain-ai/langchainjs/issues/6623
-        // The following is a workaround to avoid the error
-        processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
-
-      } else if (llmProvider === "google_gemini" || llmProvider === "google_genai") {
-        // Google Gemini API rejects nullable fields and requires strict OpenAPI 3.0 subset compliance
-        // Transform schema to meet Gemini's strict requirements
-        const result = makeJsonSchemaGeminiCompatible(processedSchema);
-        if (result.wasTransformed) {
-          logger.info(`MCP server "${serverName}/${tool.name}"`, 
-            "Schema transformed for Gemini: ", result.changesSummary);
-        }
-        processedSchema = result.schema;
-
-      } else if (llmProvider === "anthropic") {
-        // Anthropic Claude has very relaxed schema requirements with no documented restrictions
-        // No schema modifications needed
-        // Claude is tested to work fine with passing the JSON schema directly
-
-      } else {
-        // Take a conservative approach and use the Zod-converted schema
-        // It's an old way, but well exercised
-        processedSchema = jsonSchemaToZod(processedSchema as JsonSchema);
-      }
-      
-      return new DynamicStructuredTool({
-        name: tool.name,
-        description: tool.description || "",
-        schema: processedSchema,
-
-        func: async function(input) {
-          logger.info(`MCP tool "${serverName}"/"${tool.name}" received input:`, input);
-
-          try {
-            // Execute tool call
-            const result = await client?.request(
-              {
-                method: "tools/call",
-                params: {
-                  name: tool.name,
-                  arguments: input,
-                },
-              },
-              CallToolResultSchema
-            );
-
-            // Handles null/undefined cases gracefully
-            if (!result?.content) {
-              logger.info(`MCP tool "${serverName}"/"${tool.name}" received null/undefined result`);
-              return "";
-            }
-
-            // Extract text content from tool results
-            // MCP tools can return multiple content types, but this library currently uses
-            // LangChain's 'content' response format which only supports text strings
-            const textContent = result.content
-              .filter(content => content.type === "text")
-              .map(content => content.text)
-              .join("\n\n");
-
-            // Alternative approach using JSON serialization (preserved for reference):
-            // const textItems = result.content
-            //   .filter(content => content.type === "text")
-            //   .map(content => content.text)
-            // const textContent = JSON.stringify(textItems);
-
-            // Log rough result size for monitoring
-            const size = new TextEncoder().encode(textContent).length
-            logger.info(`MCP tool "${serverName}"/"${tool.name}" received result (size: ${size})`);
-
-            // If no text content, return a clear message describing the situation
-            return textContent || "No text content available in response";
-
-          } catch (error: unknown) {
-              logger.warn(`MCP tool "${serverName}"/"${tool.name}" caused error: ${error}`);
-              return `Error executing MCP tool: ${error}`;
-          }
-        },
-      });
-    });
+    const tools = toolsResponse.tools.map((tool) =>
+      createLangChainTool(tool, serverName, client, llmProvider, logger)
+    );
 
     logger.info(`MCP server "${serverName}": ${tools.length} tool(s) available:`);
     tools.forEach((tool) => logger.info(`- ${tool.name}`));
