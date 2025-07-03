@@ -1,4 +1,12 @@
-// Most MCP servers use Draft 7 or compatible
+/**
+ * JSON Schema Draft 7 interface definition.
+ * 
+ * The official MCP specification uses JSON Schema Draft 7
+ * 
+ * References:
+ * - MCP specification: https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2025-06-18/schema.json
+ * - JSON Schema Draft 7: https://json-schema.org/draft-07
+ */
 export interface JsonSchemaDraft7 {
   // JSON Schema core
   $schema?: string;
