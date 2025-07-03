@@ -75,7 +75,7 @@ export function makeJsonSchemaGeminiCompatible(
   const result = transformSchemaInternal(schema, defsContext, tracker);
   
   return {
-    schema: result,
+    schema: result as JsonSchema,
     wasTransformed: getTotalChanges(tracker) > 0,
     changesSummary: generateChangesSummary(tracker),
   };
