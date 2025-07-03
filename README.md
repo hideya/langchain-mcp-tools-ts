@@ -316,7 +316,9 @@ Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/C
 Different LLM providers have incompatible JSON Schema requirements for function calling:
 
 - **OpenAI requires**: Optional fields must be nullable (`.optional()` + `.nullable()`)
-- **Google Gemini API**: Rejects nullable fields and requires strict OpenAPI 3.0 subset compliance
+  for function calling (based on Structured Outputs API requirements,
+  strict enforcement coming in future SDK versions)"
+- **Google Gemini API**: Rejects nullable fields and `$defs` references, requires strict OpenAPI 3.0 subset compliance
 - **Anthropic Claude**: Very relaxed schema requirements with no documented restrictions
 
 **Note**: Google Vertex AI provides OpenAI-compatible endpoints that support nullable fields.

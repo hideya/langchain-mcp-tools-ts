@@ -2,14 +2,17 @@
  * Transforms a JSON Schema to be compatible with OpenAI's function calling requirements
  * Used for converting MCP tool schemas to OpenAI function declarations
  * 
- * OpenAI requires that optional fields must also be nullable to avoid API errors.
+ * OpenAI requires that optional fields must be nullable (.optional() + .nullable())
+ * for function calling to avoid API errors (based on Structured Outputs API requirements,
+ * strict enforcement coming in future SDK versions).
+ * 
  * This adapter specifically fixes the Zod-related error:
  * "Zod field uses `.optional()` without `.nullable()` which is not supported by the API"
  * 
  * This function processes the raw JSON schema before converting it to Zod
  * to ensure OpenAI compatibility by making all non-required fields nullable.
  * 
- * The official OpenAI documentation states that in structured outputs,
+ * The official OpenAI documentation states that in Structured Outputs,
  * all fields must be required OR if optional, they must also be nullable.
  * 
  * For OpenAI function calling requirements:
