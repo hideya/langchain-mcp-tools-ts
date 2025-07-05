@@ -4,7 +4,9 @@ A simple, lightweight library intended to simplify the use of
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools with LangChain.
 
-Its simplicity and extra features, such as tool schema adjustments and stdio MCP server logging,
+Its simplicity and extra features, such as
+[tools schema adjustments for LLM compatibility](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility)
+and [tools invocation logging](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#debugging-and-logging),
 make it a useful basis for your experiments and customizations.
 However, it only supports text results of tool calls and does not support MCP features other than Tools.
 
@@ -20,23 +22,19 @@ server tools with LangChain / TypeScript.
 
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is the de facto industry standard
 that dramatically expands the scope of LLMs by enabling the integration of external tools and resources,
-including DBs, GitHub, Google Drive, Docker, Slack, Notion, Spotify, and more.
+including DBs, Cloud Storages, GitHub, Docker, Slack, and more.
+There are [quite a few useful MCP servers already available.
+See [MCP Server Listing on the Official Site](https://github.com/modelcontextprotocol/servers?tab=readme-ov-file#model-context-protocol-servers).
 
-There are quite a few useful MCP servers already available:
-
-- [MCP Server Listing on the Official Site](https://github.com/modelcontextprotocol/servers?tab=readme-ov-file#model-context-protocol-servers)
-- [MCP.so - Find Awesome MCP Servers and Clients](https://mcp.so/)
-- [Smithery: MCP Server Registry](https://smithery.ai/)
-
-This utility's goal is to make these numerous MCP servers easily accessible from LangChain.
-
+This utility's goal is to make these numerous MCP servers easily accessible from LangChain.  
 It contains a utility function `convertMcpToLangchainTools()`.  
 This async function handles parallel initialization of specified multiple MCP servers
 and converts their available tools into an array of LangChain-compatible tools.
+It also performs LLM provider-specific schema transformations
+to prevent [schema compatibility issues](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility)
 
 For detailed information on how to use this library, please refer to the following document:
-- ["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a)
-
+["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a).  
 A Python equivalent of this utility is available
 [here](https://pypi.org/project/langchain-mcp-tools)
 
@@ -125,7 +123,7 @@ A minimal but complete working usage example can be found
 [in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
 
 For hands-on experimentation with MCP server integration,
-try [this MCP Client CLI tool built with this library](https://www.npmjs.com/package/@h1deya/mcp-try-cli)
+try [this MCP Client CLI tool built with this library](https://www.npmjs.com/package/@h1deya/mcp-client-cli)
 
 ## Building from Source
 

@@ -25,8 +25,8 @@ export async function test(): Promise<void> {
   // one of the following code snippets and one of the appropriate "weather"
   // server configurations, while commenting out the others.
 
-  const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
-    "SSE",  "npx -y @h1deya/mcp-server-weather");
+  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
+  //   "SSE",  "npx -y @h1deya/mcp-server-weather");
 
   // // NOTE: without the following line, I got this error:
   // //   ReferenceError: WebSocket is not defined
@@ -57,43 +57,43 @@ export async function test(): Promise<void> {
         ]
       },
 
-      // weather: {
-      //   command: "npx",
-      //   args: [
-      //     "-y",
-      //    "@h1deya/mcp-server-weather"
-      //   ]
-      // },
-      
-      // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
-      weather: {
-        url: `http://localhost:${sseServerPort}/sse`
+      "us-weather": {  // US weather only
+        command: "npx",
+        args: [
+          "-y",
+         "@h1deya/mcp-server-weather"
+        ]
       },
       
+      // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
+      // "us-weather": {
+      //   url: `http://localhost:${sseServerPort}/sse`
+      // },
+      
       // // THIS DOESN'T WORK: Example of explicit transport selection:
-      // weather: {
+      // "us-weather": {
       //   url: `http://localhost:${streamableHttpServerPort}/mcp`,
       //   transport: "streamable_http"  // Force Streamable HTTP
       //   // type: "http"  // VSCode-style config also works instead of the above
       // },
       
-      // weather: {
+      // "us-weather": {
       //   url: `http://localhost:${sseServerPort}/sse`,
       //   transport: "sse"  // Force SSE
       //   // type: "sse"  // This also works instead of the above
       // },
 
-      // weather: {
+      // "us-weather": {
       //   url: `ws://localhost:${wsServerPort}/message`
       //   // optionally `transport: "ws"` or `type: "ws"`
       // },
 
-      // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
-      "brave-search": {
-          "command": "npx",
-          "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
-          "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
-      },
+      // // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
+      // "brave-search": {
+      //     "command": "npx",
+      //     "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
+      //     "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+      // },
 
       // // Example of authentication via Authorization header
       // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
@@ -106,16 +106,16 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      notion: {
-        "command": "npx",
-        "args": ["-y", "@notionhq/notion-mcp-server"],
-        "env": {
-          // Although the following implies that this MCP server is designed for
-          // OpenAI LLMs, it works fine with others models.
-          // Tested Claude and Gemini (with schema adjustments).
-          "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-        },
-      },
+      // notion: {
+      //   "command": "npx",
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
+      //   "env": {
+      //     // Although the following implies that this MCP server is designed for
+      //     // OpenAI LLMs, it works fine with others models.
+      //     // Tested Claude and Gemini (with schema adjustments).
+      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
+      //   },
+      // },
 
       // "notion": {
       //   "command": "npx",
@@ -224,7 +224,7 @@ export async function test(): Promise<void> {
     console.log("\nLLM model:", llm.constructor.name, llm.model);
     console.log("\x1b[0m");  // reset the color
 
-    // const query = "Are there any weather alerts in California?";
+    const query = "Are there any weather alerts in California?";
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
@@ -236,7 +236,7 @@ export async function test(): Promise<void> {
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //   "in the correct sequence: baking, proofing, mixing, kneading, cooling";
     // const query = "Tell me about my Notion account";
-    const query = "What's the news from Tokyo today?";
+    // const query = "What's the news from Tokyo today?";
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
@@ -264,7 +264,8 @@ export async function test(): Promise<void> {
         console.error(`Error closing log file: ${logPath}:`, error);
       }
     });
-    // the followings only needed when testing the `url` key
+
+    // the following only needed when testing the `url` key
     if (typeof sseServerProcess !== 'undefined') {
       sseServerProcess.kill();
     }
