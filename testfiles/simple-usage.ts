@@ -134,6 +134,7 @@ export async function test(): Promise<void> {
       //   ],
       //   cwd: "/tmp"  // the working directory to be use by the server
       // },
+
       // "sequential-thinking": {
       //   command: "npx",
       //   args: [
@@ -141,6 +142,7 @@ export async function test(): Promise<void> {
       //     "@modelcontextprotocol/server-sequential-thinking"
       //   ]
       // },
+
       // playwright: {
       //   command: "npx",
       //   args: [
@@ -193,8 +195,7 @@ export async function test(): Promise<void> {
     const llm = new ChatGoogleGenerativeAI({
       // https://ai.google.dev/gemini-api/docs/pricing
       // https://console.cloud.google.com/billing
-      model: "gemini-2.0-flash"
-      // model: "gemini-2.5-flash"
+      model: "gemini-2.5-flash"
       // model: "gemini-2.5-pro"
     });
 
@@ -230,11 +231,11 @@ export async function test(): Promise<void> {
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me how many of directories in `.`";
     // const query = "Tell me how many github repositories I have?"
-    // const query = "Make a DB and put items fruits, apple and orange, with counts 123 and 345 respectively";
-    // const query = "Put items fruits, apple and orange, with counts 123 and 456 respectively to the DB, " +
-    //   "increment the coutns by 1, and show all the items in the DB.";
+    // const query = "Make a new table in DB and put items apple and orange with counts 123 and 345 respectively, " +
+    //               "then increment the coutns by 1, and show all the items in the table."
     // const query = "Use sequential thinking to arrange these events of backing bread " +
-    //   "in the correct sequence: baking, proofing, mixing, kneading, cooling";
+    //               "in the correct sequence: baking, proofing, mixing, kneading, cooling";
+    // const query = "Open bbc.com page";
     // const query = "Tell me about my Notion account";
     // const query = "What's the news from Tokyo today?";
 

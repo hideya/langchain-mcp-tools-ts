@@ -23,7 +23,7 @@ server tools with LangChain / TypeScript.
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is the de facto industry standard
 that dramatically expands the scope of LLMs by enabling the integration of external tools and resources,
 including DBs, Cloud Storages, GitHub, Docker, Slack, and more.
-There are [quite a few useful MCP servers already available.
+There are quite a few useful MCP servers already available.  
 See [MCP Server Listing on the Official Site](https://github.com/modelcontextprotocol/servers?tab=readme-ov-file#model-context-protocol-servers).
 
 This utility's goal is to make these numerous MCP servers easily accessible from LangChain.  
@@ -308,7 +308,7 @@ Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/C
 1. **Enable debug logging**: Set `logLevel: "debug"` to see detailed connection and execution logs
 2. **Check server stderr**: For stdio MCP servers, use `stderr` redirection to capture server error output
 3. **Test explicit transports**: Try forcing specific transport types to isolate auto-detection issues
-4. **Verify server independently**: Test the MCP server with other clients (e.g., MCP Inspector)
+4. **Verify server independently**: Refer to [Debugging Section in MCP documentation](https://modelcontextprotocol.io/docs/tools/debugging)
 
 ### LLM Provider Schema Compatibility
 
