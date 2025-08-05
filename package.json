@@ -78,6 +78,7 @@
     "@langchain/google-genai": "^0.2.12",
     "@langchain/langgraph": "^0.2.36",
     "@langchain/openai": "^0.3.16",
+    "@langchain/xai": "^0.1.0",
     "@types/node": "^22.10.5",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.19.0",

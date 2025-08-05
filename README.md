@@ -1,8 +1,10 @@
 # MCP to LangChain Tools Conversion Utility / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools) [![network dependents](https://dependents.info/hideya/langchain-mcp-tools-ts/badge)](https://dependents.info/hideya/langchain-mcp-tools-ts)
 
-A simple, lightweight library intended to simplify the use of
+A simple, lightweight library to use 
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-server tools with LangChain.
+server tools from LangChain.
+
+<img style="width:450px;" alt="langchain-mcp-tools-diagram" src="https://raw.githubusercontent.com/hideya/langchain-mcp-tools-py/refs/heads/main/docs/images/langchain-mcp-tools-diagram.png" />
 
 Its simplicity and extra features, such as
 [tools schema adjustments for LLM compatibility](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility)
@@ -14,30 +16,6 @@ However, it only supports text results of tool calls and does not support MCP fe
 which supports comprehensive integration with LangChain, has been released.
 You may want to consider using it if you don't have specific needs for this library.
 
-## Introduction
-
-This package is intended to simplify the use of
-[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-server tools with LangChain / TypeScript.
-
-[Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is the de facto industry standard
-that dramatically expands the scope of LLMs by enabling the integration of external tools and resources,
-including DBs, Cloud Storages, GitHub, Docker, Slack, and more.
-There are quite a few useful MCP servers already available.  
-See [MCP Server Listing on the Official Site](https://github.com/modelcontextprotocol/servers?tab=readme-ov-file#model-context-protocol-servers).
-
-This utility's goal is to make these numerous MCP servers easily accessible from LangChain.  
-It contains a utility function `convertMcpToLangchainTools()`.  
-This async function handles parallel initialization of specified multiple MCP servers
-and converts their available tools into an array of LangChain-compatible tools.
-It also performs LLM provider-specific schema transformations
-to prevent [schema compatibility issues](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility)
-
-For detailed information on how to use this library, please refer to the following document:
-["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a).  
-A Python equivalent of this utility is available
-[here](https://pypi.org/project/langchain-mcp-tools)
-
 ## Prerequisites
 
 - Node.js 18+
@@ -48,14 +26,7 @@ A Python equivalent of this utility is available
 npm i @h1deya/langchain-mcp-tools
 ```
 
-## API docs
-
-Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
-
 ## Quick Start
-
-A minimal but complete working usage example can be found
-[in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
 
 `convertMcpToLangchainTools()` utility function accepts MCP server configurations
 that follow the same structure as
@@ -125,9 +96,30 @@ A minimal but complete working usage example can be found
 For hands-on experimentation with MCP server integration,
 try [this MCP Client CLI tool built with this library](https://www.npmjs.com/package/@h1deya/mcp-client-cli)
 
-## Building from Source
+A Python equivalent of this utility is available
+[here](https://pypi.org/project/langchain-mcp-tools)
 
-See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md) for details.
+## Introduction
+
+This package is intended to simplify the use of
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+server tools with LangChain / TypeScript.
+
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is the de facto industry standard
+that dramatically expands the scope of LLMs by enabling the integration of external tools and resources,
+including DBs, Cloud Storages, GitHub, Docker, Slack, and more.
+There are quite a few useful MCP servers already available.  
+See [MCP Server Listing on the Official Site](https://github.com/modelcontextprotocol/servers?tab=readme-ov-file#model-context-protocol-servers).
+
+This utility's goal is to make these numerous MCP servers easily accessible from LangChain.  
+It contains a utility function `convertMcpToLangchainTools()`.  
+This async function handles parallel initialization of specified multiple MCP servers
+and converts their available tools into an array of LangChain-compatible tools.
+It also performs LLM provider-specific schema transformations
+to prevent [schema compatibility issues](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility)
+
+For detailed information on how to use this library, please refer to the following document:
+["Supercharging LangChain: Integrating 2000+ MCP with ReAct"](https://medium.com/@h1deya/supercharging-langchain-integrating-450-mcp-with-react-d4e467cbf41a).
 
 ## MCP Protocol Support
 
@@ -141,12 +133,19 @@ The library uses LangChain's `response_format: 'content'` (the default), which o
 While MCP tools can return multiple content types (text, images, etc.), this library currently filters and uses only text content.
 - **MCP Features**: Only MCP [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are supported. Other MCP features like Resources, Prompts, and Sampling are not implemented.
 
-### Notes:
+### Notes
 
 - **LLM Compatibility and Schema Transformations**: The library can perform schema transformations for LLM compatibility.
   [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
 - **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to stdio server configrations if not explicitly provided to ensure servers can find required executables.
 
+## API docs
+
+Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
+
+## Building from Source
+
+See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md) for details.
 
 ## Features
 
@@ -310,15 +309,25 @@ Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/C
 3. **Test explicit transports**: Try forcing specific transport types to isolate auto-detection issues
 4. **Verify server independently**: Refer to [Debugging Section in MCP documentation](https://modelcontextprotocol.io/docs/tools/debugging)
 
+### Debugging Authentication
+
+1. **Check your tokens/credentials** - Most auth failures are due to expired or incorrect tokens
+2. **Verify token permissions** - Some MCP servers require specific scopes (e.g., GitHub Copilot license)
+3. **Test with curl** - Try a simple HTTP request to verify your auth setup:
+
+   ```bash
+   curl -H "Authorization: Bearer your-token" https://api.example.com/mcp/
+   ```
+
 ### LLM Provider Schema Compatibility
 
 Different LLM providers have incompatible JSON Schema requirements for function calling:
 
 - **OpenAI requires**: Optional fields must be nullable (`.optional()` + `.nullable()`)
   for function calling (based on Structured Outputs API requirements,
-  strict enforcement coming in future SDK versions)"
+  strict enforcement coming in future SDK versions)
 - **Google Gemini API**: Rejects nullable fields and `$defs` references, requires strict OpenAPI 3.0 subset compliance
-- **Anthropic Claude**: Very relaxed schema requirements with no documented restrictions
+- **Anthropic Claude** and **xAI Grok**: Very relaxed schema requirements with no documented restrictions
 
 **Note**: Google Vertex AI provides OpenAI-compatible endpoints that support nullable fields.
 
@@ -365,8 +374,8 @@ const { tools, cleanup } = await convertMcpToLangchainTools(
 | Provider | Transformations Applied |
 |----------|------------------------|
 | `openai` | Makes optional fields nullable, handles union types |
-| `google_gemini` | Filters invalid required fields, fixes anyOf variants, removes unsupported features |
-| `anthropic` | Accepts schemas as-is, but handles them efficiently |
+| `google_gemini` or `google_genai` | Filters invalid required fields, fixes anyOf variants, removes unsupported features |
+| `anthropic` and `xai` | Accepts schemas as-is, but handles them efficiently |
 
 For other providers, try without specifying the option:
 
@@ -432,5 +441,5 @@ Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
 
 ### For Developers
 
-See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md)
+See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md)
 for more information about development and testing.

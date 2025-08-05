@@ -4,6 +4,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
+import { ChatXAI } from "@langchain/xai";
 import WebSocket from 'ws';
 import * as fs from "fs";
 
@@ -199,6 +200,12 @@ export async function test(): Promise<void> {
       // model: "gemini-2.5-pro"
     });
 
+    // const llm = new ChatXAI({
+    //   // https://console.x.ai
+    //   model: "grok-3-mini"
+    //   // model: "grok-4"
+    // });
+
     let llmProvider: LlmProvider = "none";
     if (llm instanceof ChatAnthropic) {
       llmProvider = "anthropic";
@@ -206,7 +213,9 @@ export async function test(): Promise<void> {
       llmProvider = "openai";
     } else if (llm as object instanceof ChatGoogleGenerativeAI) {
       llmProvider = "google_genai";
-    } 
+    } else if (llm as object instanceof ChatXAI) {
+      llmProvider = "xai";
+    }
 
     const { tools, cleanup } = await convertMcpToLangchainTools(
       mcpServers, { llmProvider }

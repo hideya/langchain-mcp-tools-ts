@@ -135,7 +135,7 @@ export interface LogOptions {
  *
  * @public
  */
-export type LlmProvider = "openai" | "google_gemini" | "google_genai" | "anthropic" | "none";
+export type LlmProvider = "openai" | "google_gemini" | "google_genai" | "anthropic" | "xai" | "none";
 
 /**
  * Configuration options for converting MCP servers to LangChain tools.
@@ -237,7 +237,7 @@ function processSchemaForLlmProvider(
     }
     processedSchema = result.schema;
 
-  } else if (llmProvider === "anthropic") {
+  } else if (llmProvider === "anthropic" || llmProvider === "xai") {
     // Anthropic Claude has very relaxed schema requirements with no documented restrictions
     // No schema modifications needed
     // Claude is tested to work fine with passing the JSON schema directly
