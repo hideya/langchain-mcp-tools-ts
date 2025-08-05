@@ -5,10 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [0.3.3] - 2025-08-06
 
 ### Added
 - Support for xAI Grok
+
+
+## [0.3.2] - 2025-08-06
+
+### Changed
+- Update dependencies
+- Refine REAMDE.md
 
 
 ## [0.3.1] - 2025-07-05

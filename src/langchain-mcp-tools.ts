@@ -238,7 +238,7 @@ function processSchemaForLlmProvider(
     processedSchema = result.schema;
 
   } else if (llmProvider === "anthropic" || llmProvider === "xai") {
-    // Anthropic Claude has very relaxed schema requirements with no documented restrictions
+    // Anthropic Claude and xAI Grok have very relaxed schema requirements with no documented restrictions
     // No schema modifications needed
     // Claude is tested to work fine with passing the JSON schema directly
 
