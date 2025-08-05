@@ -4,7 +4,7 @@ A simple, lightweight library to use
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools from LangChain.
 
-<img style="width:450px;" alt="langchain-mcp-tools-diagram" src="https://raw.githubusercontent.com/hideya/langchain-mcp-tools-py/refs/heads/main/docs/images/langchain-mcp-tools-diagram.png" />
+<img width="500px" alt="langchain-mcp-tools-diagram" src="https://raw.githubusercontent.com/hideya/langchain-mcp-tools-py/refs/heads/main/docs/images/langchain-mcp-tools-diagram.png" />
 
 Its simplicity and extra features, such as
 [tools schema adjustments for LLM compatibility](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility)
@@ -59,6 +59,7 @@ const { tools, cleanup } = await convertMcpToLangchainTools(
     llmProvider: "google_gemini"
     // llmProvider: "openai"
     // llmProvider: "anthropic"
+    // llmProvider: "xai"
   }
 );
 ```
