@@ -191,8 +191,8 @@ export async function test(): Promise<void> {
     // const llm = new ChatOpenAI({
     //   // https://platform.openai.com/docs/pricing
     //   // https://platform.openai.com/settings/organization/billing/overview
-    //   model: "gpt-4.1-nano"
-    //   // model: "gpt-5-mini"
+    //   // model: "gpt-4.1-nano"
+    //   model: "gpt-5-mini"
     // });
 
     const llm = new ChatGoogleGenerativeAI({
@@ -251,7 +251,7 @@ export async function test(): Promise<void> {
     console.log("\nLLM model:", llm.constructor.name, llm.model);
     console.log("\x1b[0m");  // reset the color
 
-    // const query = "Are there any weather alerts in California?";
+    const query = "Are there any weather alerts in California?";
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
@@ -262,7 +262,7 @@ export async function test(): Promise<void> {
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //               "in the correct sequence: baking, proofing, mixing, kneading, cooling";
     // const query = "Open bbc.com page";
-    const query = "Tell me about my Notion account";
+    // const query = "Tell me about my Notion account";
     // const query = "What's the news from Tokyo today?";
 
     console.log("\x1b[33m");  // color to yellow
