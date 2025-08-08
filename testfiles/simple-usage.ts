@@ -2,7 +2,9 @@ import "dotenv/config";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatCerebras } from "@langchain/cerebras";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatGroq } from "@langchain/groq";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatXAI } from "@langchain/xai";
 import WebSocket from 'ws';
@@ -189,8 +191,8 @@ export async function test(): Promise<void> {
     // const llm = new ChatOpenAI({
     //   // https://platform.openai.com/docs/pricing
     //   // https://platform.openai.com/settings/organization/billing/overview
-    //   model: "gpt-4o-mini"
-    //   // model: "o4-mini"
+    //   model: "gpt-4.1-nano"
+    //   // model: "gpt-5-mini"
     // });
 
     const llm = new ChatGoogleGenerativeAI({
@@ -204,6 +206,21 @@ export async function test(): Promise<void> {
     //   // https://console.x.ai
     //   model: "grok-3-mini"
     //   // model: "grok-4"
+    // });
+
+    // const llm = new ChatGroq({
+    //   // https://console.groq.com/docs/models
+    //   // https://console.groq.com/dashboard/usage
+    //   model: "openai/gpt-oss-20b"
+    //   // model: "openai/gpt-oss-120b"
+    // });
+
+    // // NOTE: @langchain/cerebras 0.0.2 has an issue with Tool calling and
+    // // it has been filed: https://github.com/langchain-ai/langchainjs/issues/8643
+    // // It needs to be fixed for sucessful MCP tool invocation.
+    // const llm = new ChatCerebras({
+    //   // hhttps://cloud.cerebras.ai
+    //   model: "gpt-oss-120b"
     // });
 
     let llmProvider: LlmProvider = "none";
@@ -234,7 +251,7 @@ export async function test(): Promise<void> {
     console.log("\nLLM model:", llm.constructor.name, llm.model);
     console.log("\x1b[0m");  // reset the color
 
-    const query = "Are there any weather alerts in California?";
+    // const query = "Are there any weather alerts in California?";
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
@@ -245,14 +262,14 @@ export async function test(): Promise<void> {
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //               "in the correct sequence: baking, proofing, mixing, kneading, cooling";
     // const query = "Open bbc.com page";
-    // const query = "Tell me about my Notion account";
+    const query = "Tell me about my Notion account";
     // const query = "What's the news from Tokyo today?";
 
     console.log("\x1b[33m");  // color to yellow
     console.log(query);
     console.log("\x1b[0m");  // reset the color
 
-    const messages =  { messages: [new HumanMessage(query)] }
+    const messages =  { messages: [new HumanMessage(query)] };
 
     const result = await agent.invoke(messages);
 
