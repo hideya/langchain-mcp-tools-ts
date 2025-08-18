@@ -215,9 +215,6 @@ export async function test(): Promise<void> {
     //   // model: "openai/gpt-oss-120b"
     // });
 
-    // // NOTE: @langchain/cerebras 0.0.2 has an issue with Tool calling and
-    // // it has been filed: https://github.com/langchain-ai/langchainjs/issues/8643
-    // // It needs to be fixed for sucessful MCP tool invocation.
     // const llm = new ChatCerebras({
     //   // hhttps://cloud.cerebras.ai
     //   model: "gpt-oss-120b"
