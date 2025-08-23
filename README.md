@@ -58,8 +58,9 @@ const { tools, cleanup } = await convertMcpToLangchainTools(
     // Perform provider-specific JSON schema transformations to prevent schema compatibility issues
     llmProvider: "google_gemini"
     // llmProvider: "openai"
-    // llmProvider: "anthropic"
-    // llmProvider: "xai"
+    // llmProvider: "anthropic"  // no transformations
+    // llmProvider: "xai"  // no transformations
+    // llmProvider: "none"  // for others (default)
   }
 );
 ```

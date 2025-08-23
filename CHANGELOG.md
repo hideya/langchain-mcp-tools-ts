@@ -5,13 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [0.3.5] - 2025-08-23
 
 ### Added
 - Usage example of gpt-oss-120b/20b on Cerebras / Groq
 
 ### Changed
-- Update usage example to test newer OpenAI models
+- Update REAMDE.md to include examples with Cerebras and Groq
+- Update @langchain/cerebras (used in test code) to 0.0.3 that includes tool call bug fix
+- Update dependencies
 
 
 ## [0.3.4] - 2025-08-06
