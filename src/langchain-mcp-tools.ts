@@ -422,6 +422,23 @@ async function convertSingleMcpToLangchainTools(
       transport = await createHttpTransportWithFallback(url, urlConfig, logger, serverName);
       logger.info(`MCP server "${serverName}": created transport, attempting connection`);
 
+      // Set up message and error handlers
+      transport.onmessage = (message) => {
+        logger.debug(`MCP server "${serverName}": Message Received:`, JSON.stringify(message, null, 2));
+      }
+
+      transport.onerror = (error) => {
+        // FIXME: somehow git remote server seems to send error with "{}" after closing
+        if (Object.keys(error).length === 0) {
+          return;
+        }
+        logger.error(`MCP server "${serverName}":`, error);
+      }
+
+      transport.onclose = () => {
+        logger.info(`MCP server "${serverName}": remote connection closed`);
+      }
+
     } else if ((transportType === "ws" || transportType === "websocket") ||
       (!transportType && (url?.protocol === "ws:" || url?.protocol === "wss:"))
     ) {

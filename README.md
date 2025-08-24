@@ -331,24 +331,24 @@ Different LLM providers have incompatible JSON Schema requirements for function 
 - **Google Gemini API**: Rejects nullable fields and `$defs` references, requires strict OpenAPI 3.0 subset compliance
 - **Anthropic Claude** and **xAI Grok**: Very relaxed schema requirements with no documented restrictions
 
-**Note**: Google Vertex AI provides OpenAI-compatible endpoints that support nullable fields.
+**Note**: Google Vertex AI provides OpenAI-compatible endpoints that support more relaxed requirements.
 
 #### Real-World Impact
 
 This creates challenges for developers trying to create universal schemas across providers.
 
 Many MCP servers generate schemas that don't satisfy all providers' requirements.  
-For example, the official Notion MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (as of Jul 2, 2025) produces:
+For example, the official Notion local MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (version 1.9.0) and the remote server (at "https://mcp.notion.com/mcp", via "mcp-remote 0.1.18") produces:
 
 **OpenAI Warnings:**
 ```
-Zod field at `#/definitions/API-get-users/properties/start_cursor` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
+Zod field at `#/definitions/read_file/properties/tail` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
 ... followed by many more
 ```
 
 **Gemini Errors:**
 ```
-GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] * GenerateContentRequest.tools[0].function_declarations[0].parameters.properties[children].items.properties[paragraph].properties[rich_text].items.properties[mention].any_of[0].required: only allowed for OBJECT type
+[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] Invalid JSON payload received. Unknown name "exclusiveMaximum" at 'tools[0].function_declarations[14].parameters.properties[1].value': Cannot find field.
 ... followed by many more
 ```
 

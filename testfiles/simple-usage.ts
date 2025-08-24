@@ -109,23 +109,23 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      // notion: {
-      //   "command": "npx",
-      //   "args": ["-y", "@notionhq/notion-mcp-server"],
-      //   "env": {
-      //     // Although the following implies that this MCP server is designed for
-      //     // OpenAI LLMs, it works fine with others models.
-      //     // Tested Claude and Gemini (with schema adjustments).
-      //     "OPENAPI_MCP_HEADERS": `{"Authorization": "Bearer ${process.env.NOTION_INTEGRATION_SECRET}", "Notion-Version": "2022-06-28"}`
-      //   },
-      // },
-
+      // The following Notion local MCP server is not recommended anymore?
+      // Refs:
+      // - https://developers.notion.com/docs/get-started-with-mcp
+      // - https://www.npmjs.com/package/@notionhq/notion-mcp-server
+      // 
       // "notion": {
       //   "command": "npx",
       //   "args": ["-y", "@suekou/mcp-notion-server"],
       //   "env": {
       //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
       //   }
+      // },
+
+      // Run Notion remote MCP server via mcp-remote
+      // "notionMCP": {
+      //     "command": "npx",
+      //     "args": ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
       // },
 
       // sqlite: {
