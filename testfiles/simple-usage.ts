@@ -209,14 +209,15 @@ export async function test(): Promise<void> {
     // });
 
     // const llm = new ChatGroq({
-    //   // https://console.groq.com/docs/models
+    //   // https://console.groq.com/docs/rate-limits
     //   // https://console.groq.com/dashboard/usage
     //   model: "openai/gpt-oss-20b"
     //   // model: "openai/gpt-oss-120b"
     // });
 
     // const llm = new ChatCerebras({
-    //   // hhttps://cloud.cerebras.ai
+    //   // https://inference-docs.cerebras.ai/models/openai-oss
+    //   // https://cloud.cerebras.ai
     //   model: "gpt-oss-120b"
     // });
 
@@ -253,7 +254,7 @@ export async function test(): Promise<void> {
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me how many of directories in `.`";
-    // const query = "Tell me how many github repositories I have?"
+    // const query = "Tell me about my GitHub profile"
     // const query = "Make a new table in DB and put items apple and orange with counts 123 and 345 respectively, " +
     //               "then increment the coutns by 1, and show all the items in the table."
     // const query = "Use sequential thinking to arrange these events of backing bread " +

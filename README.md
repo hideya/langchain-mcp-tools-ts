@@ -51,6 +51,10 @@ const mcpServers: McpServersConfig = {
       "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
     }
   },
+  notionMCP: {  // For fMCP servers that require OAuth, consider using "mcp-remote"
+    command: "npx",
+    args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+  },
 };
 
 const { tools, cleanup } = await convertMcpToLangchainTools(
@@ -254,6 +258,17 @@ alone is not enough; your GitHub account must have an active Copilot subscriptio
 
 Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE transport. According to the [official MCP documentation](https://modelcontextprotocol.io/docs/concepts/transports): "SSE as a standalone transport is deprecated as of protocol version 2025-03-26. It has been replaced by Streamable HTTP, which incorporates SSE as an optional streaming mechanism."
 
+### Accessing Remote MCP Servers with OAuth Quickly
+
+If you need to use MCP servers that require OAuth quickly, consider using **"[mcp-remote](https://www.npmjs.com/package/mcp-remote)"**.
+
+```ts
+    notionMCP: {
+      command: "npx",
+      args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+    },
+```
+
 ### Authentication Support for Streamable HTTP Connections
 
 The library supports OAuth 2.1 authentication for Streamable HTTP connections:
@@ -337,8 +352,8 @@ Different LLM providers have incompatible JSON Schema requirements for function 
 
 This creates challenges for developers trying to create universal schemas across providers.
 
-Many MCP servers generate schemas that don't satisfy all providers' requirements.  
-For example, the official Notion local MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (version 1.9.0) and the remote server (at "https://mcp.notion.com/mcp", via "mcp-remote 0.1.18") produces:
+Some MCP servers generate schemas that don't satisfy all providers' requirements.  
+For example, the official Notion local MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (version 1.9.0) and the remote server (at "https://mcp.notion.com/mcp", mcp-remote 0.1.18) produces:
 
 **OpenAI Warnings:**
 ```
@@ -377,7 +392,7 @@ const { tools, cleanup } = await convertMcpToLangchainTools(
 |----------|------------------------|
 | `openai` | Makes optional fields nullable, handles union types |
 | `google_gemini` or `google_genai` | Filters invalid required fields, fixes anyOf variants, removes unsupported features |
-| `anthropic` and `xai` | Accepts schemas as-is, but handles them efficiently |
+| `anthropic` and `xai` | No transformations, but the schemas are handled slightly more efficiently |
 
 For other providers, try without specifying the option:
 
