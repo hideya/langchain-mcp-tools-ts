@@ -51,7 +51,7 @@ const mcpServers: McpServersConfig = {
       "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
     }
   },
-  notionMCP: {  // For fMCP servers that require OAuth, consider using "mcp-remote"
+  notion: {  // For MCP servers that require OAuth, consider using "mcp-remote"
     command: "npx",
     args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
   },

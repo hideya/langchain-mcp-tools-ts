@@ -1,6 +1,6 @@
 {
   "name": "@h1deya/langchain-mcp-tools",
-  "version": "0.3.6",
+  "version": "0.3.8",
   "description": "MCP To LangChain Tools Conversion Utility",
   "license": "MIT",
   "keywords": [
@@ -44,7 +44,7 @@
     "watch": "tsc --watch",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "clean": "git clean -fdxn -e .env && read -p 'OK?' && git clean -fdx -e .env",
+    "clean": "git clean -fdxn -e .env && read -p '\nOK? ' && git clean -fdx -e .env",
     "_comment_test": "# Testing scripts",
     "test": "vitest run",
     "test:watch": "vitest",

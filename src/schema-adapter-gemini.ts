@@ -55,6 +55,7 @@ interface TransformationTracker {
   exclusiveBoundsConverted: number;
   requiredFieldsFiltered: number;
   anyOfVariantsFixed: number;
+  anyOfMergedFields: number;
 }
 
 export function makeJsonSchemaGeminiCompatible(
@@ -70,6 +71,7 @@ export function makeJsonSchemaGeminiCompatible(
     exclusiveBoundsConverted: 0,
     requiredFieldsFiltered: 0,
     anyOfVariantsFixed: 0,
+    anyOfMergedFields: 0,
   };
 
   const result = transformSchemaInternal(schema, defsContext, tracker);
@@ -308,6 +310,75 @@ function transformSchemaInternal(
     result.anyOf = transformAnyOfVariants(schema.oneOf, defsContext, tracker);
   }
 
+  // CRITICAL FIX for Gemini 1.5-flash: anyOf cannot coexist with other fields
+  // This addresses the "anyOf must be the only field set" validation error
+  if (result.anyOf && (result.properties || result.required || result.type || result.description || result.example)) {
+    // Strategy: merge base schema properties into each anyOf variant
+    const baseSchema: Partial<GeminiCompatibleSchema> = {};
+    
+    // Collect base properties that need to be merged
+    if (result.properties) baseSchema.properties = result.properties;
+    if (result.required) baseSchema.required = result.required;
+    if (result.type) baseSchema.type = result.type;
+    if (result.description) baseSchema.description = result.description;
+    if (result.example) baseSchema.example = result.example;
+    if (result.nullable) baseSchema.nullable = result.nullable;
+    
+    // Merge base schema into each anyOf variant
+    result.anyOf = result.anyOf.map(variant => {
+      const mergedVariant: GeminiCompatibleSchema = { ...variant };
+      
+      // Merge properties
+      if (baseSchema.properties || variant.properties) {
+        mergedVariant.properties = {
+          ...(baseSchema.properties || {}),
+          ...(variant.properties || {})
+        };
+      }
+      
+      // Merge required fields
+      if (baseSchema.required || variant.required) {
+        const baseRequired = baseSchema.required || [];
+        const variantRequired = variant.required || [];
+        const combinedRequired = [...new Set([...baseRequired, ...variantRequired])];
+        if (combinedRequired.length > 0) {
+          mergedVariant.required = combinedRequired;
+        }
+      }
+      
+      // Use variant-specific type if available, otherwise fall back to base type
+      if (!variant.type && baseSchema.type) {
+        mergedVariant.type = baseSchema.type;
+      }
+      
+      // Use variant-specific description if available, otherwise fall back to base description
+      if (!variant.description && baseSchema.description) {
+        mergedVariant.description = baseSchema.description;
+      }
+      
+      // Merge other base properties if not present in variant
+      if (baseSchema.example !== undefined && mergedVariant.example === undefined) {
+        mergedVariant.example = baseSchema.example;
+      }
+      if (baseSchema.nullable !== undefined && mergedVariant.nullable === undefined) {
+        mergedVariant.nullable = baseSchema.nullable;
+      }
+      
+      return mergedVariant;
+    });
+    
+    // Remove conflicting base fields from root level
+    delete result.properties;
+    delete result.required;
+    delete result.type;
+    delete result.description;
+    delete result.example;
+    delete result.nullable;
+    
+    tracker.fieldsConverted.push('anyOf + other fields → merged variants');
+    tracker.anyOfMergedFields++;
+  }
+
   // Track removal of unsupported fields
   const unsupportedFields = [
     '$schema', '$id', '$ref', '$defs', 'definitions', 
@@ -333,7 +404,8 @@ function getTotalChanges(tracker: TransformationTracker): number {
          tracker.formatsRemoved.length + 
          tracker.exclusiveBoundsConverted +
          tracker.requiredFieldsFiltered +
-         tracker.anyOfVariantsFixed;
+         tracker.anyOfVariantsFixed +
+         tracker.anyOfMergedFields;
 }
 
 function generateChangesSummary(tracker: TransformationTracker): string {
@@ -357,6 +429,10 @@ function generateChangesSummary(tracker: TransformationTracker): string {
   
   if (tracker.anyOfVariantsFixed > 0) {
     changes.push(`${tracker.anyOfVariantsFixed} anyOf variant(s) fixed`);
+  }
+  
+  if (tracker.anyOfMergedFields > 0) {
+    changes.push(`${tracker.anyOfMergedFields} anyOf+fields merged`);
   }
   
   if (tracker.formatsRemoved.length > 0) {

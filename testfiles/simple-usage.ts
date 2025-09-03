@@ -109,23 +109,30 @@ export async function test(): Promise<void> {
       //   }
       // },
 
-      // The following Notion local MCP server is not recommended anymore?
-      // Refs:
-      // - https://developers.notion.com/docs/get-started-with-mcp
-      // - https://www.npmjs.com/package/@notionhq/notion-mcp-server
-      // 
-      // "notion": {
+      // // The following Notion local MCP server is not recommended anymore?
+      // // Refs:
+      // // - https://developers.notion.com/docs/get-started-with-mcp
+      // // - https://www.npmjs.com/package/@notionhq/notion-mcp-server
+      // notion: {
       //   "command": "npx",
-      //   "args": ["-y", "@suekou/mcp-notion-server"],
+      //   "args": ["-y", "@notionhq/notion-mcp-server"],
       //   "env": {
-      //     "NOTION_API_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
+      //     "NOTION_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
       //   }
       // },
 
-      // Run Notion remote MCP server via mcp-remote
-      // "notionMCP": {
+      // // Run Notion remote MCP server via mcp-remote
+      // notion: {
       //     "command": "npx",
       //     "args": ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+      // },
+
+      // airtable: {
+      //   command: "npx",
+      //   "args": ["-y", "airtable-mcp-server"],
+      //   env: {
+      //     "AIRTABLE_API_KEY": `${process.env.AIRTABLE_API_KEY}`,
+      //   }
       // },
 
       // sqlite: {
@@ -200,6 +207,8 @@ export async function test(): Promise<void> {
       // https://console.cloud.google.com/billing
       model: "gemini-2.5-flash"
       // model: "gemini-2.5-pro"
+      // model: "gemini-1.5-flash"
+      // model: "gemini-1.5-pro"  // need pro for notion
     });
 
     // const llm = new ChatXAI({
@@ -254,13 +263,14 @@ export async function test(): Promise<void> {
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
     // const query = "Tell me how many of directories in `.`";
-    // const query = "Tell me about my GitHub profile"
+    // const query = "Tell me about my GitHub profile";
     // const query = "Make a new table in DB and put items apple and orange with counts 123 and 345 respectively, " +
-    //               "then increment the coutns by 1, and show all the items in the table."
+    //               "then increment the coutns by 1, and show all the items in the table.";
     // const query = "Use sequential thinking to arrange these events of backing bread " +
     //               "in the correct sequence: baking, proofing, mixing, kneading, cooling";
     // const query = "Open bbc.com page";
     // const query = "Tell me about my Notion account";
+    // const query = "Tell me about my Airtable account";
     // const query = "What's the news from Tokyo today?";
 
     console.log("\x1b[33m");  // color to yellow

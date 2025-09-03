@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
-## [Unreleased]
+## [0.3.8] - 2025-09-03
+
+### Fixed
+- Issue #52: Gemini 1.5 needs improved schema transformations
 
 ### Changed
 - Misleading texts in README.md
