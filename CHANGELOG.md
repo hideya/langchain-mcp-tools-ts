@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
+## [Unreleased]
+
+### Changed
+- Minor updates to REAMDE and usage examples
+
+
 ## [0.3.8] - 2025-09-03
 
 ### Fixed

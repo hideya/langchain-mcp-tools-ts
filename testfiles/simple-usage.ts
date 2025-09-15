@@ -109,6 +109,15 @@ export async function test(): Promise<void> {
       //   }
       // },
 
+      // // NOTE: comment out "fetch" when you use "notion".
+      // // They both have a tool named "fetch," which causes a conflict.
+      //
+      // // Run Notion remote MCP server via mcp-remote
+      // notion: {
+      //     "command": "npx",  // OAuth via "mcp-remote"
+      //     "args": ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+      // },
+      //
       // // The following Notion local MCP server is not recommended anymore?
       // // Refs:
       // // - https://developers.notion.com/docs/get-started-with-mcp
@@ -119,12 +128,6 @@ export async function test(): Promise<void> {
       //   "env": {
       //     "NOTION_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
       //   }
-      // },
-
-      // // Run Notion remote MCP server via mcp-remote
-      // notion: {
-      //     "command": "npx",
-      //     "args": ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
       // },
 
       // airtable: {
@@ -262,13 +265,12 @@ export async function test(): Promise<void> {
     // const query = "Tell me how LLMs work in a few sentences";
     // const query = "Read the news headlines on bbc.com";
     // const query = "Read and briefly summarize the LICENSE file";
-    // const query = "Tell me how many of directories in `.`";
+    // const query = "Tell me how many directories there are in `.`";
     // const query = "Tell me about my GitHub profile";
     // const query = "Make a new table in DB and put items apple and orange with counts 123 and 345 respectively, " +
     //               "then increment the coutns by 1, and show all the items in the table.";
-    // const query = "Use sequential thinking to arrange these events of backing bread " +
-    //               "in the correct sequence: baking, proofing, mixing, kneading, cooling";
-    // const query = "Open bbc.com page";
+    // const query = "Use sequential-thinking and plan a trip from Tokyo to San Francisco";
+    // const query = "Open the BBC.com page, then close it";
     // const query = "Tell me about my Notion account";
     // const query = "Tell me about my Airtable account";
     // const query = "What's the news from Tokyo today?";

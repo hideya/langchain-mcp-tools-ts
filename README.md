@@ -96,6 +96,25 @@ const agent = createReactAgent({
 });
 ```
 
+The returned `cleanup` function properly handles resource cleanup:
+
+- Closes all MCP server connections concurrently and logs any cleanup failures
+- Continues cleanup of remaining servers even if some fail
+- Should always be called when done using the tools
+
+It is typically invoked in a finally block:
+
+```ts
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+
+try {
+  // Use tools with your LLM
+} finally {
+  // Always cleanup, even if errors occur
+  await cleanup();
+}
+```
+
 A minimal but complete working usage example can be found
 [in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
 
@@ -144,14 +163,6 @@ While MCP tools can return multiple content types (text, images, etc.), this lib
 - **LLM Compatibility and Schema Transformations**: The library can perform schema transformations for LLM compatibility.
   [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
 - **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to stdio server configrations if not explicitly provided to ensure servers can find required executables.
-
-## API docs
-
-Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
-
-## Building from Source
-
-See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md) for details.
 
 ## Features
 
@@ -260,7 +271,7 @@ Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE tra
 
 ### Accessing Remote MCP Servers with OAuth Quickly
 
-If you need to use MCP servers that require OAuth quickly, consider using **"[mcp-remote](https://www.npmjs.com/package/mcp-remote)"**.
+If you need to use MCP servers that require OAuth, consider using **"[mcp-remote](https://www.npmjs.com/package/mcp-remote)"**.
 
 ```ts
     notionMCP: {
@@ -313,9 +324,17 @@ Test implementations are provided:
   - MCP client uses this library: [streamable-http-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-client.ts)
   - Test MCP Server:  [streamable-http-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-server.ts)
 
+## API docs
+
+Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
+
 ## Change Log
 
 Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/CHANGELOG.md)
+
+## Building from Source
+
+See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md) for details.
 
 ## Appendix
 
@@ -408,27 +427,6 @@ const { tools, cleanup } = await convertMcpToLangchainTools(
 - [Gemini API Schema Requirements](https://ai.google.dev/api/caching#Schema)
 - [Anthropic Tool Use](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview)
 
-
-### Resource Management
-
-The returned `cleanup` function properly handles resource cleanup:
-
-- Closes all MCP server connections concurrently
-- Logs any cleanup failures
-- Continues cleanup of remaining servers even if some fail
-- Should always be called when done using the tools
-
-```ts
-const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
-
-try {
-  // Use tools with your LLM
-} finally {
-  // Always cleanup, even if errors occur
-  await cleanup();
-}
-```
-
 ### Debugging and Logging
 
 The library provides configurable logging to help debug connection and tool execution issues:
@@ -458,5 +456,5 @@ Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
 
 ### For Developers
 
-See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md)
+See [./README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md)
 for more information about development and testing.
