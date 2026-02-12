@@ -51,21 +51,21 @@ class TestAuthProvider implements OAuthClientProvider {
   }
   
   async clientInformation() { return this._clientInfo; }
-  async saveClientInformation(info) { this._clientInfo = info; }
+  async saveClientInformation(info: any) { this._clientInfo = info; }
   async tokens() { return this._tokens; }
-  async saveTokens(tokens) { this._tokens = tokens; }
+  async saveTokens(tokens: any) { this._tokens = tokens; }
   async codeVerifier() { return this._codeVerifier; }
-  async saveCodeVerifier(verifier) { this._codeVerifier = verifier; }
-  async redirectToAuthorization(url) { throw new Error("Auth required"); }
+  async saveCodeVerifier(verifier: any) { this._codeVerifier = verifier; }
+  async redirectToAuthorization(url: any) { throw new Error("Auth required"); }
 }
 
 // Debug logger for client-side events
 const log = {
-  info: (...args) => console.log("ℹ️", ...args),
-  warn: (...args) => console.log("⚠️", ...args),
-  error: (...args) => console.log("❌", ...args),
-  debug: (...args) => console.log("🔍", ...args),
-  success: (...args) => console.log("✅", ...args)
+  info: (...args: any[]) => console.log("ℹ️", ...args),
+  warn: (...args: any[]) => console.log("⚠️", ...args),
+  error: (...args: any[]) => console.log("❌", ...args),
+  debug: (...args: any[]) => console.log("🔍", ...args),
+  success: (...args: any[]) => console.log("✅", ...args)
 };
 
 // Enhanced debug logging for HTTP
@@ -94,7 +94,7 @@ function setupDebugLogging() {
       }
       
       return response;
-    } catch (error) {
+    } catch (error: any) {
       log.error("HTTP Error:", error.message);
       throw error;
     }
@@ -113,7 +113,7 @@ async function main() {
     const response = await fetch(SERVER_URL);
     if (!response.ok) throw new Error(`Server error: ${response.status}`);
     log.success("Server is running");
-  } catch (error) {
+  } catch (error: any) {
     log.error("Server unavailable:", error.message);
     return;
   }
@@ -177,7 +177,7 @@ async function main() {
     log.success("Test completed successfully!");
     
     
-  } catch (error) {
+  } catch (error: any) {
     log.error("Test failed:", error.message);
     
     if (error.stack) {

@@ -27,9 +27,9 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
 }));
 
 describe('convertMcpToLangchainTools', () => {
-  let mockConnect;
-  let mockRequest;
-  let mockTransportClose;
+  let mockConnect: any;
+  let mockRequest: any;
+  let mockTransportClose: any;
 
   beforeEach(() => {
     // Reset all mocks before each test
@@ -77,7 +77,7 @@ describe('convertMcpToLangchainTools', () => {
 
   it('should successfully convert MCP server to LangChain tools', async () => {
     // Mock successful tool listing response
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [
@@ -122,7 +122,7 @@ describe('convertMcpToLangchainTools', () => {
   });
 
   it('should handle multiple servers and tools', async () => {
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [
@@ -157,7 +157,7 @@ describe('convertMcpToLangchainTools', () => {
   });
 
   it('should handle empty tool results correctly', async () => {
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return { tools: [] };
       }
@@ -174,7 +174,7 @@ describe('convertMcpToLangchainTools', () => {
   });
 
   it('should handle tool execution errors', async () => {
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [{ name: 'error-tool', description: 'Error Tool', inputSchema: { type: 'object' } }]
@@ -193,7 +193,7 @@ describe('convertMcpToLangchainTools', () => {
   });
 
   it('should handle different content types in tool results', async () => {
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [{ name: 'mixed-content', description: 'Test Tool', inputSchema: { type: 'object' } }]
@@ -221,7 +221,7 @@ describe('convertMcpToLangchainTools', () => {
     mockTransportClose.mockRejectedValueOnce(new Error('Cleanup failed'));
     mockTransportClose.mockResolvedValueOnce();
 
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [{ name: 'test-tool', description: 'Test Tool', inputSchema: { type: 'object' } }]
@@ -240,7 +240,7 @@ describe('convertMcpToLangchainTools', () => {
   });
 
   it('should handle logger with different log levels', async () => {
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [{ name: 'test-tool', description: 'Test Tool', inputSchema: { type: 'object' } }]
@@ -277,7 +277,7 @@ describe('convertMcpToLangchainTools', () => {
   });
 
   it('should handle missing tool descriptions', async () => {
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [{
@@ -299,7 +299,7 @@ describe('convertMcpToLangchainTools', () => {
   });
 
   it('should handle environment variables in config', async () => {
-    mockRequest.mockImplementation((req) => {
+    mockRequest.mockImplementation((req: any) => {
       if (req.method === 'tools/list') {
         return {
           tools: [{ name: 'test-tool', description: 'Test Tool', inputSchema: { type: 'object' } }]
