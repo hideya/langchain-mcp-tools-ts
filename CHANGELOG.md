@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- [Issue #53](https://github.com/hideya/langchain-mcp-tools-ts/issues/53):
+  Compatibility with LangChain 1.2.x
+- [Issue #54](https://github.com/hideya/langchain-mcp-tools-ts/issues/54):
+  Make sure to work with latest models including GPT 5, Claude 4.5, Gemini 3 preview and Grok 4.1
+
 ### Changed
 - Minor updates to REAMDE and usage examples
 
