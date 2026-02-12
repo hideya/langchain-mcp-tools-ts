@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-02-12
+
 ### Fixed
 - [Issue #53](https://github.com/hideya/langchain-mcp-tools-ts/issues/53):
   Compatibility with LangChain 1.2.x
