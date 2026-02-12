@@ -1,6 +1,5 @@
 import "dotenv/config";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { HumanMessage } from "@langchain/core/messages";
+import { createAgent, HumanMessage } from "langchain";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
@@ -78,41 +77,41 @@ export async function test(): Promise<void> {
 
     // Uncomment one of the following and select the LLM to use
 
-    const llm = new ChatOpenAI({
+    const model = new ChatOpenAI({
       // https://developers.openai.com/api/docs/pricing
       // https://platform.openai.com/settings/organization/billing/overview
       model: "gpt-5-mini"
       // model: "openai:gpt-5.2"
     });
 
-    // const llm = new ChatAnthropic({
+    // const model = new ChatAnthropic({
     //   // https://platform.claude.com/docs/en/about-claude/models/overview
     //   // https://console.anthropic.com/settings/billing
     //   model: "claude-3-5-haiku-latest"
-    //   // model: "anthropic:claude-haiku-4-5"
+    //   // model: "claude-haiku-4-5"
     // });
 
-    // const llm = new ChatGoogleGenerativeAI({
+    // const model = new ChatGoogleGenerativeAI({
     //   // https://ai.google.dev/gemini-api/docs/pricing
     //   // https://console.cloud.google.com/billing
     //   model: "gemini-2.5-flash"
     //   // model: "gemini-3-flash-preview"
     // });
 
-    // const llm = new ChatXAI({
+    // const model = new ChatXAI({
     //   // https://docs.x.ai/developers/models
     //   model: "grok-3-mini"
     //   // model: "grok-4-1-fast-non-reasoning"
     // });
 
     let llmProvider: LlmProvider = "none";
-    if (llm instanceof ChatAnthropic) {
+    if (model instanceof ChatAnthropic) {
       llmProvider = "anthropic";
-    } else if (llm as object instanceof ChatOpenAI) {
+    } else if (model as object instanceof ChatOpenAI) {
       llmProvider = "openai";
-    } else if (llm as object instanceof ChatGoogleGenerativeAI) {
+    } else if (model as object instanceof ChatGoogleGenerativeAI) {
       llmProvider = "google_genai";
-    } else if (llm as object instanceof ChatXAI) {
+    } else if (model as object instanceof ChatXAI) {
       llmProvider = "xai";
     }
 
@@ -122,13 +121,13 @@ export async function test(): Promise<void> {
 
     mcpCleanup = cleanup
 
-    const agent = createReactAgent({
-      llm,
+    const agent = createAgent({
+      model,
       tools
     });
 
     console.log("\x1b[32m");  // color to green
-    console.log("\nLLM model:", llm.constructor.name, llm.model);
+    console.log("\nLLM model:", model.constructor.name, model.model);
     console.log("\x1b[0m");  // reset the color
 
     const query = "Are there any weather alerts in California?";

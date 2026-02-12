@@ -1,6 +1,5 @@
 import "dotenv/config";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { HumanMessage } from "@langchain/core/messages";
+import { createAgent, HumanMessage } from "langchain";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatCerebras } from "@langchain/cerebras";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
@@ -48,49 +47,50 @@ export async function test(): Promise<void> {
         ]
       },
 
-      // Embedding the value of an environment variable
-      // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
-      "brave-search": {
-        command: "npx",
-        args: [ "-y", "@modelcontextprotocol/server-brave-search"],
-        env: { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
-      },
+      // // Embedding the value of an environment variable
+      // // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
+      // "brave-search": {
+      //   command: "npx",
+      //   args: [ "-y", "@modelcontextprotocol/server-brave-search"],
+      //   env: { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+      // },
 
-      // Example of remote MCP server authentication via Authorization header
-      // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
-      github: {
-        // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
-        type: "http",  // or `transport: "http",`
-        url: "https://api.githubcopilot.com/mcp/",
-        headers: {
-          "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
-        }
-      },
+      // // Example of remote MCP server authentication via Authorization header
+      // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
+      // github: {
+      //   // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
+      //   type: "http",  // or `transport: "http",`
+      //   url: "https://api.githubcopilot.com/mcp/",
+      //   headers: {
+      //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
+      //   }
+      // },
 
-      // For remote MCP servers that require OAuth, consider using "mcp-remote"
-      notion: {
-        command: "npx",
-        args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
-      },
+      // // For remote MCP servers that require OAuth, consider using "mcp-remote"
+      // notion: {
+      //   command: "npx",
+      //   args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+      // },
 
-      // This Airtable local server has schema issues with Google GenAI
-      airtable: {
-        command: "npx",
-        "args": ["-y", "airtable-mcp-server@1.10.0"],
-        env: {
-          "AIRTABLE_API_KEY": `${process.env.AIRTABLE_API_KEY}`,
-        }
-      },
+      // // This Airtable local server has schema issues with Google GenAI
+      // airtable: {
+      //   command: "npx",
+      //   "args": ["-y", "airtable-mcp-server@1.10.0"],
+      //   env: {
+      //     "AIRTABLE_API_KEY": `${process.env.AIRTABLE_API_KEY}`,
+      //   }
+      // },
     };
 
     const queries = [
       "Read and briefly summarize the LICENSE file in the current directory",
-      // "Fetch the raw HTML content from bbc.com and tell me the titile",
+      "Fetch the raw HTML content from bbc.com and tell me the titile",
       // // NOTE: The following is to test tool call error handling
       // "Try to fetch the raw HTML content from abc.bbc.com, bbc.com and xyz.bbc.com, and tell me which is succesful",
       // "Search for 'news in California' and show the first hit",
       // "Tell me about my default GitHub profile",
       // "Tell me about my default Notion account",
+      // "Tell me which tables I have in my Airtable account",
     ]
 
     // // If you are interested in local MCP server's stderr redirection,
@@ -120,54 +120,54 @@ export async function test(): Promise<void> {
 
     // Uncomment one of the following and select the LLM to use
 
-    const llm = new ChatOpenAI({
+    const model = new ChatOpenAI({
       // https://developers.openai.com/api/docs/pricing
       // https://platform.openai.com/settings/organization/billing/overview
       model: "gpt-5-mini"
-      // model: "openai:gpt-5.2"
+      // model: "gpt-5.2"
     });
 
-    // const llm = new ChatAnthropic({
+    // const model = new ChatAnthropic({
     //   // https://platform.claude.com/docs/en/about-claude/models/overview
     //   // https://console.anthropic.com/settings/billing
     //   model: "claude-3-5-haiku-latest"
-    //   // model: "anthropic:claude-haiku-4-5"
+    //   // model: "claude-haiku-4-5"
     // });
 
-    // const llm = new ChatGoogleGenerativeAI({
+    // const model = new ChatGoogleGenerativeAI({
     //   // https://ai.google.dev/gemini-api/docs/pricing
     //   // https://console.cloud.google.com/billing
     //   model: "gemini-2.5-flash"
     //   // model: "gemini-3-flash-preview"
     // });
 
-    // const llm = new ChatXAI({
+    // const model = new ChatXAI({
     //   // https://docs.x.ai/developers/models
     //   model: "grok-3-mini"
     //   // model: "grok-4-1-fast-non-reasoning"
     // });
 
-    // const llm = new ChatGroq({
+    // const model = new ChatGroq({
     //   // https://console.groq.com/docs/rate-limits
     //   // https://console.groq.com/dashboard/usage
     //   model: "openai/gpt-oss-20b"
     //   // model: "openai/gpt-oss-120b"
     // });
 
-    // const llm = new ChatCerebras({
+    // const model = new ChatCerebras({
     //   // https://cloud.cerebras.ai
     //   // https://inference-docs.cerebras.ai/models/openai-oss
     //   model: "gpt-oss-120b"
     // });
 
     let llmProvider: LlmProvider = "none";
-    if (llm instanceof ChatAnthropic) {
+    if (model instanceof ChatAnthropic) {
       llmProvider = "anthropic";
-    } else if (llm as object instanceof ChatOpenAI) {
+    } else if (model as object instanceof ChatOpenAI) {
       llmProvider = "openai";
-    } else if (llm as object instanceof ChatGoogleGenerativeAI) {
+    } else if (model as object instanceof ChatGoogleGenerativeAI) {
       llmProvider = "google_genai";
-    } else if (llm as object instanceof ChatXAI) {
+    } else if (model as object instanceof ChatXAI) {
       llmProvider = "xai";
     }
 
@@ -179,13 +179,13 @@ export async function test(): Promise<void> {
 
     mcpCleanup = cleanup
 
-    const agent = createReactAgent({
-      llm,
+    const agent = createAgent({
+      model,
       tools
     });
 
     console.log("\x1b[32m");  // color to green
-    console.log("\nLLM model:", llm.constructor.name, llm.model);
+    console.log("\nLLM model:", model.constructor.name, model.model);
     console.log("\x1b[0m");  // reset the color
 
     for (const query of queries) {
