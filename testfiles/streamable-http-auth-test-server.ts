@@ -40,7 +40,7 @@ const transports = new Map();
 
 // Enable extra debugging
 const DEBUG = true;
-function debug(...args) {
+function debug(...args: any[]) {
   if (DEBUG) {
     console.log("[DEBUG]", ...args);
   }
@@ -55,40 +55,47 @@ app.use(cors({
 app.use(express.json({limit: "10mb"}));
 app.use(express.urlencoded({ extended: true }));
 
-// Create an MCP server instance
-const server = new McpServer({
-  name: "MCP Streamable HTTP Auth Test Server",
-  version: "1.0.0"
-});
+// Factory function to create a fresh McpServer instance per session.
+// A single McpServer instance cannot be reused across multiple connections:
+// the SDK's Protocol.connect() throws "Already connected to a transport" if
+// connect() is called again without first calling close() on the server itself.
+function createMcpServer(): McpServer {
+  const server = new McpServer({
+    name: "MCP Streamable HTTP Auth Test Server",
+    version: "1.0.0"
+  });
 
-// Add a simple echo tool
-server.tool(
-  "echo",
-  { message: z.string().describe("Message to echo back") },
-  async ({ message }) => ({
-    content: [{ type: "text", text: `[Streamable HTTP] ${message}` }]
-  })
-);
+  // Add a simple echo tool
+  server.tool(
+    "echo",
+    { message: z.string().describe("Message to echo back") },
+    async ({ message }) => ({
+      content: [{ type: "text", text: `[Streamable HTTP] ${message}` }]
+    })
+  );
 
-// Add an authenticated info tool
-server.tool(
-  "server-info",
-  {},
-  async () => ({
-    content: [{ 
-      type: "text", 
-      text: "MCP Streamable HTTP Auth Test Server - Authentication successful!" 
-    }]
-  })
-);
+  // Add an authenticated info tool
+  server.tool(
+    "server-info",
+    {},
+    async () => ({
+      content: [{
+        type: "text",
+        text: "MCP Streamable HTTP Auth Test Server - Authentication successful!"
+      }]
+    })
+  );
+
+  return server;
+}
 
 // Root endpoint
-app.get("/", (req, res) => {
+app.get("/", (req: any, res: any) => {
   res.send("MCP Streamable HTTP Auth Test Server Running");
 });
 
 // Auth middleware
-function authenticate(req, res, next) {
+function authenticate(req: any, res: any, next: any) {
   debug("Authenticating Streamable HTTP request...");
   
   const authHeader = req.headers.authorization;
@@ -135,7 +142,7 @@ function authenticate(req, res, next) {
 }
 
 // Basic token endpoint
-app.post("/token", (req, res) => {
+app.post("/token", (req: any, res: any) => {
   console.log("Token request:", req.body);
   
   const clientId = req.body.client_id || "test_client_id";
@@ -152,7 +159,7 @@ app.post("/token", (req, res) => {
 });
 
 // Main MCP endpoint for Streamable HTTP transport
-app.all("/mcp", authenticate, async (req, res) => {
+app.all("/mcp", authenticate, async (req: any, res: any) => {
   debug(`Received ${req.method} request to /mcp`);
   debug("Headers:", req.headers);
   
@@ -189,9 +196,10 @@ app.all("/mcp", authenticate, async (req, res) => {
         }
       };
       
-      // Connect to the MCP server
+      // Connect a fresh MCP server instance to this transport
       try {
-        await server.connect(transport);
+        const mcpServer = createMcpServer();
+        await mcpServer.connect(transport);
         debug("MCP server connected to new transport");
       } catch (error) {
         console.error("Error connecting MCP server:", error);
@@ -209,7 +217,7 @@ app.all("/mcp", authenticate, async (req, res) => {
     // Handle the request through the transport
     try {
       await transport.handleRequest(req, res, req.body);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error handling request:", error);
       if (!res.headersSent) {
         res.status(500).json({
