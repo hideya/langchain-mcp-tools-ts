@@ -7,7 +7,6 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatGroq } from "@langchain/groq";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatXAI } from "@langchain/xai";
-import WebSocket from 'ws';
 import * as fs from "fs";
 
 import {
@@ -86,7 +85,7 @@ export async function test(): Promise<void> {
 
     const queries = [
       "Read and briefly summarize the LICENSE file in the current directory",
-      "Fetch the raw HTML content from bbc.com and tell me the titile",
+      // "Fetch the raw HTML content from bbc.com and tell me the titile",
       // // NOTE: The following is to test tool call error handling
       // "Try to fetch the raw HTML content from abc.bbc.com, bbc.com and xyz.bbc.com, and tell me which is succesful",
       // "Search for 'news in California' and show the first hit",

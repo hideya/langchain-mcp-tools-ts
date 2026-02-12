@@ -70,8 +70,8 @@
   },
   "dependencies": {
     "@h1deya/json-schema-to-zod": "^0.1.1",
-    "@langchain/core": "^0.3.62",
-    "@modelcontextprotocol/sdk": "^1.15.0",
+    "@langchain/core": ">=0.3.62",
+    "@modelcontextprotocol/sdk": ">=1.15.0",
     "zod": "^3.25.74"
   },
   "devDependencies": {
