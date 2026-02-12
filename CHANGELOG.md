@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+
+## [0.4.0] - 2026-02-13
+
+### Fixed
+- The version number should have been updated to v0.4.0 rather than v0.3.9.
+  Although the implementation hasn't changed, the dependencies have been considerably relaxed
+  for compatibility with LangChain 1.2.x
+
+
 ## [0.3.9] - 2026-02-12
 
 ### Fixed
