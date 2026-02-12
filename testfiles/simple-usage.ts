@@ -17,27 +17,13 @@ import {
   McpToolsLogger,
   LlmProvider
 } from "../src/langchain-mcp-tools";
+// } from "@h1deya/langchain-mcp-tools";
 
 import { startRemoteMcpServerLocally } from "./remote-server-utils";
 
 export async function test(): Promise<void> {
   let mcpCleanup: McpServerCleanupFn | undefined;
   const openedLogFiles: { [serverName: string]: number } = {};
-
-  // If you are interested in testing the SSE/WS server setup, uncomment
-  // one of the following code snippets and one of the appropriate "weather"
-  // server configurations, while commenting out the others.
-
-  // const [sseServerProcess, sseServerPort] = await startRemoteMcpServerLocally(
-  //   "SSE",  "npx -y @h1deya/mcp-server-weather");
-
-  // // NOTE: without the following line, I got this error:
-  // //   ReferenceError: WebSocket is not defined
-  // //     at <anonymous> (.../node_modules/@modelcontextprotocol/sdk/src/client/websocket.ts:29:26)
-  // global.WebSocket = WebSocket as any;
-  //
-  // const [wsServerProcess, wsServerPort] = await startRemoteMcpServerLocally(
-  //   "WS",  "npx -y @h1deya/mcp-server-weather");
 
   try {
     const mcpServers: McpServersConfig = {
@@ -53,171 +39,113 @@ export async function test(): Promise<void> {
         // cwd: "/tmp"  // the working directory to be use by the server
       },
 
+      // Local MCP server that uses `uvx`
+      // https://pypi.org/project/mcp-server-fetch/
+      // This Fetch local server has schema issues with Google GenAI
       fetch: {
         command: "uvx",
         args: [
-          "mcp-server-fetch"
+          "mcp-server-fetch==2025.4.7"
         ]
       },
 
-      "us-weather": {  // US weather only
+      // Embedding the value of an environment variable
+      // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
+      "brave-search": {
         command: "npx",
-        args: [
-          "-y",
-         "@h1deya/mcp-server-weather"
-        ]
+        args: [ "-y", "@modelcontextprotocol/server-brave-search"],
+        env: { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
       },
-      
-      // // Auto-detection example: This will try Streamable HTTP first, then fallback to SSE
-      // "us-weather": {
-      //   url: `http://localhost:${sseServerPort}/sse`
-      // },
-      
-      // // THIS DOESN'T WORK: Example of explicit transport selection:
-      // "us-weather": {
-      //   url: `http://localhost:${streamableHttpServerPort}/mcp`,
-      //   transport: "streamable_http"  // Force Streamable HTTP
-      //   // type: "http"  // VSCode-style config also works instead of the above
-      // },
-      
-      // "us-weather": {
-      //   url: `http://localhost:${sseServerPort}/sse`,
-      //   transport: "sse"  // Force SSE
-      //   // type: "sse"  // This also works instead of the above
-      // },
 
-      // "us-weather": {
-      //   url: `ws://localhost:${wsServerPort}/message`
-      //   // optionally `transport: "ws"` or `type: "ws"`
-      // },
+      // Example of remote MCP server authentication via Authorization header
+      // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
+      github: {
+        // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
+        type: "http",  // or `transport: "http",`
+        url: "https://api.githubcopilot.com/mcp/",
+        headers: {
+          "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
+        }
+      },
 
-      // // https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search
-      // "brave-search": {
-      //     "command": "npx",
-      //     "args": [ "-y", "@modelcontextprotocol/server-brave-search"],
-      //     "env": { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
-      // },
+      // For remote MCP servers that require OAuth, consider using "mcp-remote"
+      notion: {
+        command: "npx",
+        args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+      },
 
-      // // Example of authentication via Authorization header
-      // // https://github.com/github/github-mcp-server?tab=readme-ov-file#remote-github-mcp-server
-      // github: {
-      //   // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
-      //   type: "http",  // or `transport: "http",`
-      //   url: "https://api.githubcopilot.com/mcp/",
-      //   headers: {
-      //     "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
-      //   }
-      // },
-
-      // // NOTE: comment out "fetch" when you use "notion".
-      // // They both have a tool named "fetch," which causes a conflict.
-      //
-      // // Run Notion remote MCP server via mcp-remote
-      // notion: {
-      //     "command": "npx",  // OAuth via "mcp-remote"
-      //     "args": ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
-      // },
-      //
-      // // The following Notion local MCP server is not recommended anymore?
-      // // Refs:
-      // // - https://developers.notion.com/docs/get-started-with-mcp
-      // // - https://www.npmjs.com/package/@notionhq/notion-mcp-server
-      // notion: {
-      //   "command": "npx",
-      //   "args": ["-y", "@notionhq/notion-mcp-server"],
-      //   "env": {
-      //     "NOTION_TOKEN": `${process.env.NOTION_INTEGRATION_SECRET}`
-      //   }
-      // },
-
-      // airtable: {
-      //   command: "npx",
-      //   "args": ["-y", "airtable-mcp-server"],
-      //   env: {
-      //     "AIRTABLE_API_KEY": `${process.env.AIRTABLE_API_KEY}`,
-      //   }
-      // },
-
-      // sqlite: {
-      //   command: "uvx",
-      //   args: [
-      //     "mcp-server-sqlite",
-      //     "--db-path",
-      //     "mcp-server-sqlite-test.sqlite3"
-      //   ],
-      //   cwd: "/tmp"  // the working directory to be use by the server
-      // },
-
-      // "sequential-thinking": {
-      //   command: "npx",
-      //   args: [
-      //     "-y",
-      //     "@modelcontextprotocol/server-sequential-thinking"
-      //   ]
-      // },
-
-      // playwright: {
-      //   command: "npx",
-      //   args: [
-      //     "@playwright/mcp@latest"
-      //   ]
-      // },
+      // This Airtable local server has schema issues with Google GenAI
+      airtable: {
+        command: "npx",
+        "args": ["-y", "airtable-mcp-server@1.10.0"],
+        env: {
+          "AIRTABLE_API_KEY": `${process.env.AIRTABLE_API_KEY}`,
+        }
+      },
     };
 
-    // If you are interested in MCP server's stderr redirection,
-    // uncomment the following code snippets.
-    //
-    // Set a file descriptor to which MCP server's stderr is redirected
-    Object.keys(mcpServers).forEach(serverName => {
-      if (mcpServers[serverName].command) {
-        const logPath = `mcp-server-${serverName}.log`;
-        const logFd = fs.openSync(logPath, "w");
-        mcpServers[serverName].stderr = logFd;
-        openedLogFiles[logPath] = logFd;
-      }
-    });
+    const queries = [
+      "Read and briefly summarize the LICENSE file in the current directory",
+      "Fetch the raw HTML content from bbc.com and tell me the titile",
+      // // NOTE: The following is to test tool call error handling
+      // "Try to fetch the raw HTML content from abc.bbc.com, bbc.com and xyz.bbc.com, and tell me which is succesful",
+      // "Search for 'news in California' and show the first hit",
+      // "Tell me about my default GitHub profile",
+      // "Tell me about my default Notion account",
+    ]
 
-    // A very simple custom logger example (optional)
-    class SimpleConsoleLogger implements McpToolsLogger {
-      constructor(private readonly prefix: string = "MCP") {}
-      private log(level: string, ...args: unknown[]) {
-        console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
-      }
-      public debug(...args: unknown[]) { this.log("DEBUG", ...args); }
-      public info(...args: unknown[]) { this.log("INFO", ...args); }
-      public warn(...args: unknown[]) { this.log("WARN", ...args); }
-      public error(...args: unknown[]) { this.log("ERROR", ...args); }
-    }
+    // // If you are interested in local MCP server's stderr redirection,
+    // // uncomment the following code snippets.
+    // //
+    // // Set a file descriptor to which MCP server's stderr is redirected
+    // Object.keys(mcpServers).forEach(serverName => {
+    //   if (mcpServers[serverName].command) {
+    //     const logPath = `mcp-server-${serverName}.log`;
+    //     const logFd = fs.openSync(logPath, "w");
+    //     mcpServers[serverName].stderr = logFd;
+    //     openedLogFiles[logPath] = logFd;
+    //   }
+    // });
+
+    // // A very simple custom logger example (optional)
+    // class SimpleConsoleLogger implements McpToolsLogger {
+    //   constructor(private readonly prefix: string = "MCP") {}
+    //   private log(level: string, ...args: unknown[]) {
+    //     console.log(`\x1b[90m${level}:\x1b[0m`, ...args);
+    //   }
+    //   public debug(...args: unknown[]) { this.log("DEBUG", ...args); }
+    //   public info(...args: unknown[]) { this.log("INFO", ...args); }
+    //   public warn(...args: unknown[]) { this.log("WARN", ...args); }
+    //   public error(...args: unknown[]) { this.log("ERROR", ...args); }
+    // }
 
     // Uncomment one of the following and select the LLM to use
 
-    // const llm = new ChatAnthropic({
-    //   // https://docs.anthropic.com/en/docs/about-claude/pricing
-    //   // https://console.anthropic.com/settings/billing
-    //   model: "claude-3-5-haiku-latest"
-    //   // model: "claude-sonnet-4-0"
-    // });
-
-    // const llm = new ChatOpenAI({
-    //   // https://platform.openai.com/docs/pricing
-    //   // https://platform.openai.com/settings/organization/billing/overview
-    //   // model: "gpt-4.1-nano"
-    //   model: "gpt-5-mini"
-    // });
-
-    const llm = new ChatGoogleGenerativeAI({
-      // https://ai.google.dev/gemini-api/docs/pricing
-      // https://console.cloud.google.com/billing
-      model: "gemini-2.5-flash"
-      // model: "gemini-2.5-pro"
-      // model: "gemini-1.5-flash"
-      // model: "gemini-1.5-pro"  // need pro for notion
+    const llm = new ChatOpenAI({
+      // https://developers.openai.com/api/docs/pricing
+      // https://platform.openai.com/settings/organization/billing/overview
+      model: "gpt-5-mini"
+      // model: "openai:gpt-5.2"
     });
 
+    // const llm = new ChatAnthropic({
+    //   // https://platform.claude.com/docs/en/about-claude/models/overview
+    //   // https://console.anthropic.com/settings/billing
+    //   model: "claude-3-5-haiku-latest"
+    //   // model: "anthropic:claude-haiku-4-5"
+    // });
+
+    // const llm = new ChatGoogleGenerativeAI({
+    //   // https://ai.google.dev/gemini-api/docs/pricing
+    //   // https://console.cloud.google.com/billing
+    //   model: "gemini-2.5-flash"
+    //   // model: "gemini-3-flash-preview"
+    // });
+
     // const llm = new ChatXAI({
-    //   // https://console.x.ai
+    //   // https://docs.x.ai/developers/models
     //   model: "grok-3-mini"
-    //   // model: "grok-4"
+    //   // model: "grok-4-1-fast-non-reasoning"
     // });
 
     // const llm = new ChatGroq({
@@ -228,8 +156,8 @@ export async function test(): Promise<void> {
     // });
 
     // const llm = new ChatCerebras({
-    //   // https://inference-docs.cerebras.ai/models/openai-oss
     //   // https://cloud.cerebras.ai
+    //   // https://inference-docs.cerebras.ai/models/openai-oss
     //   model: "gpt-oss-120b"
     // });
 
@@ -261,35 +189,22 @@ export async function test(): Promise<void> {
     console.log("\nLLM model:", llm.constructor.name, llm.model);
     console.log("\x1b[0m");  // reset the color
 
-    const query = "Are there any weather alerts in California?";
-    // const query = "Tell me how LLMs work in a few sentences";
-    // const query = "Read the news headlines on bbc.com";
-    // const query = "Read and briefly summarize the LICENSE file";
-    // const query = "Tell me how many directories there are in `.`";
-    // const query = "Tell me about my GitHub profile";
-    // const query = "Make a new table in DB and put items apple and orange with counts 123 and 345 respectively, " +
-    //               "then increment the coutns by 1, and show all the items in the table.";
-    // const query = "Use sequential-thinking and plan a trip from Tokyo to San Francisco";
-    // const query = "Open the BBC.com page, then close it";
-    // const query = "Tell me about my Notion account";
-    // const query = "Tell me about my Airtable account";
-    // const query = "What's the news from Tokyo today?";
+    for (const query of queries) {
+      console.log("\x1b[33m");  // color to yellow
+      console.log(query);
+      console.log("\x1b[0m");  // reset the color
 
-    console.log("\x1b[33m");  // color to yellow
-    console.log(query);
-    console.log("\x1b[0m");  // reset the color
+      const messages =  { messages: [new HumanMessage(query)] };
 
-    const messages =  { messages: [new HumanMessage(query)] };
+      const result = await agent.invoke(messages);
 
-    const result = await agent.invoke(messages);
+      // the last message should be an AIMessage
+      const response = result.messages[result.messages.length - 1].content;
 
-    // the last message should be an AIMessage
-    const response = result.messages[result.messages.length - 1].content;
-
-    console.log("\x1b[36m");  // color to cyan
-    console.log(response);
-    console.log("\x1b[0m");  // reset the color
-
+      console.log("\x1b[36m");  // color to cyan
+      console.log(response);
+      console.log("\x1b[0m");  // reset the color
+    }
   } finally {
     await mcpCleanup?.();
 
@@ -301,14 +216,6 @@ export async function test(): Promise<void> {
         console.error(`Error closing log file: ${logPath}:`, error);
       }
     });
-
-    // the following only needed when testing the `url` key
-    if (typeof sseServerProcess !== 'undefined') {
-      sseServerProcess.kill();
-    }
-    if (typeof wsServerProcess !== 'undefined') {
-      wsServerProcess.kill();
-    }
   }
 }
 

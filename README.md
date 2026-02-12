@@ -14,7 +14,7 @@ However, it only supports text results of tool calls and does not support MCP fe
 
 [LangChain's **official LangChain.js MCP Adapters** library](https://www.npmjs.com/package/@langchain/mcp-adapters),
 which supports comprehensive integration with LangChain, has been released.
-You may want to consider using it if you don't have specific needs for this library.
+You might want to consider using it if the extra features that this library supports are not necessary.
 
 ## Prerequisites
 

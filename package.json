@@ -51,6 +51,8 @@
     "test:coverage": "vitest run --coverage",
     "_comment_examples": "# Basic usage examples",
     "example:simple": "tsx testfiles/simple-usage.ts",
+    "_comment_sse_ws": "# SSE and WS transport tests",
+    "test:sse-and-ws": "tsx testfiles/sse-and-ws-test.ts",
     "_comment_streamable": "# Streamable HTTP transport tests",
     "test:streamable:auth:server": "tsx testfiles/streamable-http-auth-test-server.ts",
     "test:streamable:auth:client": "tsx testfiles/streamable-http-auth-test-client.ts",
