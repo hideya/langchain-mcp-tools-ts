@@ -44,6 +44,11 @@ const mcpServers: McpServersConfig = {
     command: "uvx",
     args: ["mcp-server-fetch"]
   },
+  "brave-search": {
+    command: "npx",
+    args: [ "-y", "@modelcontextprotocol/server-brave-search"],
+    env: { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+  },
   github: {
     type: "http",
     url: "https://api.githubcopilot.com/mcp/",
@@ -86,12 +91,12 @@ to be invoked to close all MCP server sessions when finished.
 The returned tools can be used with LangChain, e.g.:
 
 ```ts
-// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-const llm = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash" });
+// import { createAgent } from "langchain";
+const model = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash" });
 
 // import { createReactAgent } from "@langchain/langgraph/prebuilt";
-const agent = createReactAgent({
-  llm,
+const agent = createAgent({
+  model,
   tools
 });
 ```
@@ -274,7 +279,7 @@ Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE tra
 If you need to use MCP servers that require OAuth, consider using **"[mcp-remote](https://www.npmjs.com/package/mcp-remote)"**.
 
 ```ts
-    notionMCP: {
+    notion: {
       command: "npx",
       args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
     },
@@ -456,5 +461,5 @@ Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
 
 ### For Developers
 
-See [./README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md)
+See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md)
 for more information about development and testing.
