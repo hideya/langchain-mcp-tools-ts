@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 
+## [0.4.1] - 2026-02-13
+
+### Fixed
+- Mistakes in README.md
+- Missing usage guide for the env variable config for local MCP servers
+
+
 ## [0.4.0] - 2026-02-13
 
 ### Fixed

@@ -91,10 +91,10 @@ to be invoked to close all MCP server sessions when finished.
 The returned tools can be used with LangChain, e.g.:
 
 ```ts
-// import { createAgent } from "langchain";
+// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 const model = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash" });
 
-// import { createReactAgent } from "@langchain/langgraph/prebuilt";
+// import { createAgent } from "langchain";
 const agent = createAgent({
   model,
   tools
@@ -167,9 +167,24 @@ While MCP tools can return multiple content types (text, images, etc.), this lib
 
 - **LLM Compatibility and Schema Transformations**: The library can perform schema transformations for LLM compatibility.
   [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
-- **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to stdio server configrations if not explicitly provided to ensure servers can find required executables.
+- **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to local (stdio) server configrations if not explicitly provided to ensure servers can find required executables.
 
 ## Features
+
+### Environment Variable Configuration for Local MCP Server
+
+If you need to pass an API key or other configurations to a local MCP server
+via environment variables, use this example as a guide:
+
+```ts
+  brave: {
+    command: "npx",
+    args: [ "-y", "@modelcontextprotocol/server-brave-search"],
+    env: { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+  },
+```
+
+**Note**: The library automatically adds the `PATH` environment variable to local (stdio) server configrations, if not explicitly provided, to ensure servers can find required executables.
 
 ### `stderr` Redirection for Local MCP Server 
 

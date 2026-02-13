@@ -1,6 +1,6 @@
 {
   "name": "@h1deya/langchain-mcp-tools",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "MCP To LangChain Tools Conversion Utility",
   "license": "MIT",
   "keywords": [
