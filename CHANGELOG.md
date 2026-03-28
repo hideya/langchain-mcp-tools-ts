@@ -6,7 +6,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
-## [Unreleased]
+## [0.4.2] - 2026-03-28
+
+### Changed
+- Update examples to include and test latest models, including gpt-5.4-mini,
+  claude-sonnet-4-6, and gemini-3.1-flash-lite-preview
+- Update dependencies and fix vulnerabilities
 
 
 ## [0.4.1] - 2026-02-13

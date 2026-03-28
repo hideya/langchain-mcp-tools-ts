@@ -19,6 +19,10 @@ You might want to consider using it if the extra features that this library supp
 ## Prerequisites
 
 - Node.js 18+
+- [optional] [npm 7+ (`npx`)](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+  to run Node.js package-based local MCP servers
+- [optional] [`uv` (`uvx`)](https://docs.astral.sh/uv/getting-started/installation/)
+  installed to run Python-based local (stdio) MCP servers
 
 ## Installation
 
@@ -47,7 +51,7 @@ const mcpServers: McpServersConfig = {
   "brave-search": {
     command: "npx",
     args: [ "-y", "@modelcontextprotocol/server-brave-search"],
-    env: { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+    env: { "BRAVE_API_KEY": process.env.BRAVE_API_KEY || "" }
   },
   github: {
     type: "http",
@@ -120,7 +124,7 @@ try {
 }
 ```
 
-A minimal but complete working usage example can be found
+**A simple working usage example** can be found
 [in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
 
 For hands-on experimentation with MCP server integration,
@@ -128,6 +132,25 @@ try [this MCP Client CLI tool built with this library](https://www.npmjs.com/pac
 
 A Python equivalent of this utility is available
 [here](https://pypi.org/project/langchain-mcp-tools)
+
+
+## API Reference
+
+Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
+
+## Change Log
+
+Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/CHANGELOG.md)
+
+## Working Usage Example
+Can be found
+[in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
+
+## Building from Source
+
+See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md) for details.
+
+<br/>
 
 ## Introduction
 
@@ -167,7 +190,7 @@ While MCP tools can return multiple content types (text, images, etc.), this lib
 
 - **LLM Compatibility and Schema Transformations**: The library can perform schema transformations for LLM compatibility.
   [See below](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README.md#llm-provider-schema-compatibility) for details.
-- **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to local (stdio) server configrations if not explicitly provided to ensure servers can find required executables.
+- **Passing PATH Env Variable**: The library automatically adds the `PATH` environment variable to local server configrations if not explicitly provided to ensure servers can find required executables.
 
 ## Features
 
@@ -180,18 +203,15 @@ via environment variables, use this example as a guide:
   brave: {
     command: "npx",
     args: [ "-y", "@modelcontextprotocol/server-brave-search"],
-    env: { "BRAVE_API_KEY": `${process.env.BRAVE_API_KEY}` }
+    env: { "BRAVE_API_KEY": process.env.BRAVE_API_KEY || "" }
   },
 ```
 
-**Note**: The library automatically adds the `PATH` environment variable to local (stdio) server configrations, if not explicitly provided, to ensure servers can find required executables.
+**Note**: The library automatically adds the `PATH` environment variable to local server configrations, if not explicitly provided, to ensure servers can find required executables.
 
 ### `stderr` Redirection for Local MCP Server 
 
-A new key `"stderr"` has been introduced to specify a file descriptor
-to which local (stdio) MCP server's stderr is redirected.  
-The key name `stderr` is derived from
-TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L32).
+A new key `"stderr"` has been introduced to specify a file descriptor to which local MCP server's stderr is redirected.
 
 ```ts
     const logPath = `mcp-server-${serverName}.log`;
@@ -200,11 +220,14 @@ TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotoc
 ```
 
 A usage example can be found [here](
-https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/694b877ed5336bfcd5274d95d3f6d14bed0937a6/src/index.ts#L72-L83)
+https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/8d36e901e55e60d8a1e1af40e2d5c8dc36a6d069/src/index.ts#L90-L101
+).  
+The key name `stderr` is derived from
+TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L32).
 
 ### Working Directory Configuration for Local MCP Servers
 
-The working directory that is used when spawning a local (stdio) MCP server
+The working directory that is used when spawning a local MCP server
 can be specified with the `"cwd"` key as follows:
 
 ```ts
@@ -224,10 +247,11 @@ The library selects transports using the following priority order:
 
 1. **Explicit transport/type field** (must match URL protocol if URL provided)
 2. **URL protocol auto-detection** (http/https → StreamableHTTP → SSE, ws/wss → WebSocket)
-3. **Command presence** → Stdio transport
+3. **Command presence** → Stdio transport (local MCP server)
 4. **Error** if none of the above match
 
-This ensures predictable behavior while allowing flexibility for different deployment scenarios.
+This ensures predictable behavior while allowing flexibility for different deployment scenarios.  
+**Note:** SSE transport is deprecated as of protocol version 2025-03-26; Streamable HTTP is the recommended approach.
 
 ### Remote MCP Server Support
 
@@ -246,7 +270,7 @@ This ensures predictable behavior while allowing flexibility for different deplo
         // type: "http"  // VSCode-style config also works instead of the above
     },
 
-    // Explicit SSE
+    // Explicit SSE (Note: SSE transport is deprecated)
     "sse-server-name": {
         url: `http://${sse_server_host}:${sse_server_port}/...`,
         transport: "sse"  // or `type: "sse"`
@@ -259,7 +283,7 @@ This ensures predictable behavior while allowing flexibility for different deplo
     },
 ```
 
-For the convenience of adding authorization headers, the following shorthand expression is supported.
+The `"headers"` key can be used to pass HTTP headers to Streamable HTTP and SSE connection.  
 This header configuration will be overridden if either `streamableHTTPOptions` or `sseOptions` is specified (details below).
 
 ```ts
@@ -273,9 +297,6 @@ This header configuration will be overridden if either `streamableHTTPOptions` o
     },
 ```
 
-NOTE: When accessing the GitHub MCP server, [GitHub PAT (Personal Access Token)](https://github.com/settings/personal-access-tokens)
-alone is not enough; your GitHub account must have an active Copilot subscription or be assigned a Copilot license through your organization.
-
 **Auto-detection behavior (default):**
 - For HTTP/HTTPS URLs without explicit `transport`, the library follows [MCP specification recommendations](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility)
 - First attempts Streamable HTTP transport
@@ -284,7 +305,7 @@ alone is not enough; your GitHub account must have an active Copilot subscriptio
 
 **Explicit transport selection:**
 - Set `transport: "streamable_http"` (or VSCode-style config `type: "http"`) to force Streamable HTTP (no fallback)
-- Set `transport: "sse"` to force SSE transport
+- Set `transport: "sse"` to force SSE transport (SSE transport is deprecated)
 - WebSocket URLs (`ws://` or `wss://`) always use WebSocket transport
 
 Streamable HTTP is the modern MCP transport that replaces the older HTTP+SSE transport. According to the [official MCP documentation](https://modelcontextprotocol.io/docs/concepts/transports): "SSE as a standalone transport is deprecated as of protocol version 2025-03-26. It has been replaced by Streamable HTTP, which incorporates SSE as an optional streaming mechanism."
@@ -344,24 +365,13 @@ Test implementations are provided:
   - MCP client uses this library: [streamable-http-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-client.ts)
   - Test MCP Server:  [streamable-http-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-server.ts)
 
-## API docs
-
-Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
-
-## Change Log
-
-Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/CHANGELOG.md)
-
-## Building from Source
-
-See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md) for details.
 
 ## Appendix
 
 ### Troubleshooting
 
 1. **Enable debug logging**: Set `logLevel: "debug"` to see detailed connection and execution logs
-2. **Check server stderr**: For stdio MCP servers, use `stderr` redirection to capture server error output
+2. **Check server stderr**: For local MCP servers, use `stderr` redirection to capture server error output
 3. **Test explicit transports**: Try forcing specific transport types to isolate auto-detection issues
 4. **Verify server independently**: Refer to [Debugging Section in MCP documentation](https://modelcontextprotocol.io/docs/tools/debugging)
 
@@ -478,3 +488,14 @@ Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
 
 See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md)
 for more information about development and testing.
+
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+[Issues](https://github.com/hideya/langchain-mcp-tools-ts/issues) and
+[pull requests](https://github.com/hideya/langchain-mcp-tools-ts/pulls) welcome!  
+In particular, please share any issues relating to the latest versions of LangChain and LLM models, as well as specific MCP servers.
