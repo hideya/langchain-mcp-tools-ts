@@ -1,6 +1,6 @@
-# MCP to LangChain Tools Conversion Utility / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools) [![network dependents](https://dependents.info/hideya/langchain-mcp-tools-ts/badge)](https://dependents.info/hideya/langchain-mcp-tools-ts)
+# MCP to LangChain Tools Conversion Library / TypeScript [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/LICENSE) [![npm version](https://img.shields.io/npm/v/@h1deya/langchain-mcp-tools.svg)](https://www.npmjs.com/package/@h1deya/langchain-mcp-tools) [![network dependents](https://dependents.info/hideya/langchain-mcp-tools-ts/badge)](https://dependents.info/hideya/langchain-mcp-tools-ts)
 
-A simple, lightweight library to use 
+A simple, lightweight library to use
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools from LangChain.
 
@@ -41,41 +41,40 @@ and is expressed as a JS Object, e.g.:
 ```ts
 const mcpServers: McpServersConfig = {
   filesystem: {
-    command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-filesystem', '.'],
   },
   fetch: {
-    command: "uvx",
-    args: ["mcp-server-fetch"]
+    command: 'uvx',
+    args: ['mcp-server-fetch'],
   },
-  "brave-search": {
-    command: "npx",
-    args: [ "-y", "@modelcontextprotocol/server-brave-search"],
-    env: { "BRAVE_API_KEY": process.env.BRAVE_API_KEY || "" }
+  'brave-search': {
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-brave-search'],
+    env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY || '' },
   },
   github: {
-    type: "http",
-    url: "https://api.githubcopilot.com/mcp/",
+    type: 'http',
+    url: 'https://api.githubcopilot.com/mcp/',
     headers: {
-      "Authorization": `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`
-    }
+      Authorization: `Bearer ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}`,
+    },
   },
-  notion: {  // For MCP servers that require OAuth, consider using "mcp-remote"
-    command: "npx",
-    args: ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+  notion: {
+    // For MCP servers that require OAuth, consider using "mcp-remote"
+    command: 'npx',
+    args: ['-y', 'mcp-remote', 'https://mcp.notion.com/mcp'],
   },
-};
+}
 
-const { tools, cleanup } = await convertMcpToLangchainTools(
-  mcpServers, {
-    // Perform provider-specific JSON schema transformations to prevent schema compatibility issues
-    llmProvider: "google_gemini"
-    // llmProvider: "openai"
-    // llmProvider: "anthropic"  // no transformations
-    // llmProvider: "xai"  // no transformations
-    // llmProvider: "none"  // for others (default)
-  }
-);
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, {
+  // Perform provider-specific JSON schema transformations to prevent schema compatibility issues
+  llmProvider: 'google_gemini',
+  // llmProvider: "openai"
+  // llmProvider: "anthropic"  // no transformations
+  // llmProvider: "xai"  // no transformations
+  // llmProvider: "none"  // for others (default)
+})
 ```
 
 This utility function initializes all specified MCP servers in parallel,
@@ -96,13 +95,13 @@ The returned tools can be used with LangChain, e.g.:
 
 ```ts
 // import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-const model = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash" });
+const model = new ChatGoogleGenerativeAI({ model: 'gemini-2.5-flash' })
 
 // import { createAgent } from "langchain";
 const agent = createAgent({
   model,
-  tools
-});
+  tools,
+})
 ```
 
 The returned `cleanup` function properly handles resource cleanup:
@@ -114,13 +113,15 @@ The returned `cleanup` function properly handles resource cleanup:
 It is typically invoked in a finally block:
 
 ```ts
-const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers);
+let mcpCleanup: McpServerCleanupFn | undefined
 
 try {
+  const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers)
+  mcpCleanup = cleanup
   // Use tools with your LLM
 } finally {
   // Always cleanup, even if errors occur
-  await cleanup();
+  await mcpCleanup?.()
 }
 ```
 
@@ -133,7 +134,6 @@ try [this MCP Client CLI tool built with this library](https://www.npmjs.com/pac
 A Python equivalent of this utility is available
 [here](https://pypi.org/project/langchain-mcp-tools)
 
-
 ## API Reference
 
 Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html)
@@ -143,6 +143,7 @@ Can be found [here](https://hideya.github.io/langchain-mcp-tools-ts/modules.html
 Can be found [here](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/CHANGELOG.md)
 
 ## Working Usage Example
+
 Can be found
 [in this example in the langchain-mcp-tools-ts-usage repo](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/main/src/index.ts)
 
@@ -182,8 +183,8 @@ It follows the [official MCP specification](https://modelcontextprotocol.io/spec
 ### Limitations
 
 - **Tool Return Types**: Currently, only text results of tool calls are supported.
-The library uses LangChain's `response_format: 'content'` (the default), which only supports text strings.
-While MCP tools can return multiple content types (text, images, etc.), this library currently filters and uses only text content.
+  The library uses LangChain's `response_format: 'content'` (the default), which only supports text strings.
+  While MCP tools can return multiple content types (text, images, etc.), this library currently filters and uses only text content.
 - **MCP Features**: Only MCP [Tools](https://modelcontextprotocol.io/docs/concepts/tools) are supported. Other MCP features like Resources, Prompts, and Sampling are not implemented.
 
 ### Notes
@@ -209,19 +210,17 @@ via environment variables, use this example as a guide:
 
 **Note**: The library automatically adds the `PATH` environment variable to local server configrations, if not explicitly provided, to ensure servers can find required executables.
 
-### `stderr` Redirection for Local MCP Server 
+### `stderr` Redirection for Local MCP Server
 
 A new key `"stderr"` has been introduced to specify a file descriptor to which local MCP server's stderr is redirected.
 
 ```ts
-    const logPath = `mcp-server-${serverName}.log`;
-    const logFd = fs.openSync(logPath, "w");
-    mcpServers[serverName].stderr = logFd;
+const logPath = `mcp-server-${serverName}.log`
+const logFd = fs.openSync(logPath, 'w')
+mcpServers[serverName].stderr = logFd
 ```
 
-A usage example can be found [here](
-https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/8d36e901e55e60d8a1e1af40e2d5c8dc36a6d069/src/index.ts#L90-L101
-).  
+A usage example can be found [here](https://github.com/hideya/langchain-mcp-tools-ts-usage/blob/8d36e901e55e60d8a1e1af40e2d5c8dc36a6d069/src/index.ts#L90-L101).  
 The key name `stderr` is derived from
 TypeScript SDK's [`StdioServerParameters`](https://github.com/modelcontextprotocol/typescript-sdk/blob/131776764536b5fdca642df51230a3746fb4ade0/src/client/stdio.ts#L32).
 
@@ -298,12 +297,14 @@ This header configuration will be overridden if either `streamableHTTPOptions` o
 ```
 
 **Auto-detection behavior (default):**
+
 - For HTTP/HTTPS URLs without explicit `transport`, the library follows [MCP specification recommendations](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#backwards-compatibility)
 - First attempts Streamable HTTP transport
 - If Streamable HTTP fails with a 4xx error, automatically falls back to SSE transport
 - Non-4xx errors (network issues, etc.) are re-thrown without fallback
 
 **Explicit transport selection:**
+
 - Set `transport: "streamable_http"` (or VSCode-style config `type: "http"`) to force Streamable HTTP (no fallback)
 - Set `transport: "sse"` to force SSE transport (SSE transport is deprecated)
 - WebSocket URLs (`ws://` or `wss://`) always use WebSocket transport
@@ -326,7 +327,7 @@ If you need to use MCP servers that require OAuth, consider using **"[mcp-remote
 The library supports OAuth 2.1 authentication for Streamable HTTP connections:
 
 ```ts
-import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
 
 // Implement your own OAuth client provider
 class MyOAuthProvider implements OAuthClientProvider {
@@ -334,37 +335,36 @@ class MyOAuthProvider implements OAuthClientProvider {
 }
 
 const mcpServers = {
-  "secure-streamable-server": {
-    url: "https://secure-mcp-server.example.com/mcp",
+  'secure-streamable-server': {
+    url: 'https://secure-mcp-server.example.com/mcp',
     // To avoid auto protocol fallback, specify the protocol explicitly when using authentication
-    transport: "streamable_http",  // or `type: "http",`
+    transport: 'streamable_http', // or `type: "http",`
     streamableHTTPOptions: {
       // Provide an OAuth client provider
       authProvider: new MyOAuthProvider(),
-      
+
       // Optionally customize HTTP requests
       requestInit: {
         headers: {
-          'X-Custom-Header': 'custom-value'
-        }
+          'X-Custom-Header': 'custom-value',
+        },
       },
-      
+
       // Optionally configure reconnection behavior
       reconnectionOptions: {
         maxReconnectAttempts: 5,
-        reconnectDelay: 1000
-      }
-    }
-  }
-};
+        reconnectDelay: 1000,
+      },
+    },
+  },
+}
 ```
 
 Test implementations are provided:
 
 - **Streamable HTTP Authentication Tests**:
   - MCP client uses this library: [streamable-http-auth-test-client.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-client.ts)
-  - Test MCP Server:  [streamable-http-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-server.ts)
-
+  - Test MCP Server: [streamable-http-auth-test-server.ts](https://github.com/hideya/langchain-mcp-tools-ts/tree/main/testfiles/streamable-http-auth-test-server.ts)
 
 ## Appendix
 
@@ -405,12 +405,14 @@ Some MCP servers generate schemas that don't satisfy all providers' requirements
 For example, the official Notion local MCP server [@notionhq/notion-mcp-server](https://www.npmjs.com/package/@notionhq/notion-mcp-server) (version 1.9.0) and the remote server (at "https://mcp.notion.com/mcp", mcp-remote 0.1.18) produces:
 
 **OpenAI Warnings:**
+
 ```
 Zod field at `#/definitions/read_file/properties/tail` uses `.optional()` without `.nullable()` which is not supported by the API. See: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#all-fields-must-be-required
 ... followed by many more
 ```
 
 **Gemini Errors:**
+
 ```
 [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [400 Bad Request] Invalid JSON payload received. Unknown name "exclusiveMaximum" at 'tools[0].function_declarations[14].parameters.properties[1].value': Cannot find field.
 ... followed by many more
@@ -421,34 +423,31 @@ Zod field at `#/definitions/read_file/properties/tail` uses `.optional()` withou
 The new option, `llmProvider`, has been introduced for performing provider-specific JSON schema transformations:
 
 ```typescript
-const { tools, cleanup } = await convertMcpToLangchainTools(
-  mcpServers, {
-    llmProvider: "openai"        // Makes optional fields nullable
-    // llmProvider: "google_gemini" // Applies Gemini's strict validation rules  
-    // llmProvider: "anthropic"     // No transformations needed
-  }
-);
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, {
+  llmProvider: 'openai', // Makes optional fields nullable
+  // llmProvider: "google_gemini" // Applies Gemini's strict validation rules
+  // llmProvider: "anthropic"     // No transformations needed
+})
 ```
 
 **Features:**
+
 - Generates INFO-level logs when transformations are applied
 - Helps users identify potential MCP server schema improvements
 - Falls back to original schema when no `llmProvider` is specified
 
 #### Provider-Specific Transformations
 
-| Provider | Transformations Applied |
-|----------|------------------------|
-| `openai` | Makes optional fields nullable, handles union types |
+| Provider                          | Transformations Applied                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `openai`                          | Makes optional fields nullable, handles union types                                 |
 | `google_gemini` or `google_genai` | Filters invalid required fields, fixes anyOf variants, removes unsupported features |
-| `anthropic` and `xai` | No transformations, but the schemas are handled slightly more efficiently |
+| `anthropic` and `xai`             | No transformations, but the schemas are handled slightly more efficiently           |
 
 For other providers, try without specifying the option:
 
 ```typescript
-const { tools, cleanup } = await convertMcpToLangchainTools(
-  mcpServers
-);
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers)
 ```
 
 #### References
@@ -463,23 +462,29 @@ The library provides configurable logging to help debug connection and tool exec
 
 ```ts
 // Configure log level
-const { tools, cleanup } = await convertMcpToLangchainTools(
-  mcpServers, 
-  { logLevel: "debug" }
-);
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, {
+  logLevel: 'debug',
+})
 
 // Use custom logger
 class MyLogger implements McpToolsLogger {
-  debug(...args: unknown[]) { console.log("[DEBUG]", ...args); }
-  info(...args: unknown[]) { console.log("[INFO]", ...args); }
-  warn(...args: unknown[]) { console.warn("[WARN]", ...args); }
-  error(...args: unknown[]) { console.error("[ERROR]", ...args); }
+  debug(...args: unknown[]) {
+    console.log('[DEBUG]', ...args)
+  }
+  info(...args: unknown[]) {
+    console.log('[INFO]', ...args)
+  }
+  warn(...args: unknown[]) {
+    console.warn('[WARN]', ...args)
+  }
+  error(...args: unknown[]) {
+    console.error('[ERROR]', ...args)
+  }
 }
 
-const { tools, cleanup } = await convertMcpToLangchainTools(
-  mcpServers,
-  { logger: new MyLogger() }
-);
+const { tools, cleanup } = await convertMcpToLangchainTools(mcpServers, {
+  logger: new MyLogger(),
+})
 ```
 
 Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
@@ -488,7 +493,6 @@ Available log levels: `"fatal" | "error" | "warn" | "info" | "debug" | "trace"`
 
 See [README_DEV.md](https://github.com/hideya/langchain-mcp-tools-ts/blob/main/README_DEV.md)
 for more information about development and testing.
-
 
 ## License
 
