@@ -4,6 +4,25 @@ A simple, lightweight library to use
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 server tools from LangChain.
 
+## Project Status
+
+This library currently supports **MCP Protocol version 2025-03-26**.
+It does **not** support the MCP **2026-07-28** specification.
+
+For new projects, we recommend using
+[LangChain's official LangChain.js MCP Adapters library](https://www.npmjs.com/package/@langchain/mcp-adapters),
+which provides comprehensive MCP integration for LangChain.
+
+This project is now in maintenance / dormant mode. Existing users may continue
+using it with MCP servers compatible with the 2025-03-26 specification, but new
+MCP protocol features will not be actively implemented here.
+
+## Introduction
+
+A simple, lightweight library to use
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+server tools from LangChain.
+
 <img width="500px" alt="langchain-mcp-tools-diagram" src="https://raw.githubusercontent.com/hideya/langchain-mcp-tools-py/refs/heads/main/docs/images/langchain-mcp-tools-diagram.png" />
 
 Its simplicity and extra features, such as
@@ -14,7 +33,7 @@ However, it only supports text results of tool calls and does not support MCP fe
 
 [LangChain's **official LangChain.js MCP Adapters** library](https://www.npmjs.com/package/@langchain/mcp-adapters),
 which supports comprehensive integration with LangChain, has been released.
-You might want to consider using it if the extra features that this library supports are not necessary.
+For new projects, it is the recommended MCP integration path for LangChain.
 
 ## Prerequisites
 
@@ -179,6 +198,14 @@ For detailed information on how to use this library, please refer to the followi
 
 This library supports **MCP Protocol version 2025-03-26** and maintains backwards compatibility with version 2024-11-05.
 It follows the [official MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/) for transport selection and backwards compatibility.
+
+This library does **not** support the MCP **2026-07-28** specification.
+The 2026-07-28 update requires substantial changes to MCP client behavior and
+the TypeScript SDK integration, and this project is not actively tracking those
+new protocol features.
+
+For new MCP integrations with LangChain, use
+[LangChain's official LangChain.js MCP Adapters library](https://www.npmjs.com/package/@langchain/mcp-adapters).
 
 ### Limitations
 
